@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  --dharma-gold: #D4A574;
+  --dharma-amber: #E8C4A0;
+  --dharma-orange: #D89B6A;
+  --dharma-saffron: #C17D4A;
+  --dharma-cream: #F5F1E8;
+  --dharma-dark: #2C2419;
+  --dharma-darker: #1A1410;
+  --dharma-bg: #EDE8DC;
+  --dharma-surface: #F5F1E8;
+  --dharma-border: rgba(212,165,116,0.2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: linear-gradient(135deg, #F5F1E8 0%, #EDE8DC 25%, #E8E3D5 50%, #EBE6D8 75%, #F0EBE0 100%);
+  background-attachment: fixed;
+  color: #4A3F2E;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(212,165,116,0.08); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--dharma-gold), var(--dharma-orange)); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, var(--dharma-amber), var(--dharma-saffron)); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(212,165,116,0.08); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--dharma-gold), var(--dharma-orange)); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, var(--dharma-amber), var(--dharma-saffron)); }
+
+input, textarea, select {
+  background-color: #1A1410 !important;
+  border: 1px solid rgba(212,165,116,0.2) !important;
+  color: #fafafa !important;
+  border-radius: 8px !important;
+}
+
+input:focus, textarea:focus {
+  border-color: var(--dharma-gold) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(212,175,55,0.2);
+}
+
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+.animate-slide-in { animation: slideIn 0.4s ease-out; }
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
