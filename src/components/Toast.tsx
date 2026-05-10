@@ -30,19 +30,39 @@ const ToastContainer: React.FC = () => {
     return () => { addToastFn = null; };
   }, []);
 
+  const dismiss = (id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
   const getStyle = (type: ToastType) => {
-    if (type === 'error') return 'bg-red-950/95 border-red-500/50 text-red-200';
-    if (type === 'success') return 'bg-green-950/95 border-green-500/50 text-green-200';
-    return 'bg-[#2C2419]/95 border-amber-600/50 text-amber-200';
+    if (type === 'error') return 'bg-red-500/[0.08] border-red-500/20 text-red-300';
+    if (type === 'success') return 'bg-green-500/[0.08] border-green-500/20 text-green-300';
+    return 'bg-[#D4A574]/[0.08] border-[#D4A574]/20 text-[#ECE6D8]/80';
+  };
+
+  const getIcon = (type: ToastType) => {
+    if (type === 'error') return 'fa-solid fa-circle-xmark text-red-400';
+    if (type === 'success') return 'fa-solid fa-circle-check text-green-400';
+    return 'fa-solid fa-circle-info text-[#D4A574]';
   };
 
   return (
-    <div className="fixed top-20 right-6 z-[300] space-y-2">
+    <div className="fixed top-20 right-4 md:right-6 z-[300] space-y-2 max-w-sm">
       <AnimatePresence>
         {toasts.map(toast => (
-          <motion.div key={toast.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
-            className={`${getStyle(toast.type)} border rounded-xl p-4 shadow-2xl max-w-sm backdrop-blur-md`}>
-            <p className="text-xs">{toast.message}</p>
+          <motion.div key={toast.id}
+            initial={{ opacity: 0, x: 50, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 50, scale: 0.95 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className={`${getStyle(toast.type)} border rounded-xl p-3.5 shadow-[0_8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl flex items-start gap-2.5 cursor-pointer`}
+            onClick={() => dismiss(toast.id)}>
+            <i className={`${getIcon(toast.type)} text-sm mt-0.5 shrink-0`}></i>
+            <p className="text-xs font-medium leading-relaxed flex-1">{toast.message}</p>
+            <button onClick={(e) => { e.stopPropagation(); dismiss(toast.id); }}
+              className="text-current opacity-30 hover:opacity-70 transition-opacity duration-300 shrink-0">
+              <i className="fa-solid fa-xmark text-xs"></i>
+            </button>
           </motion.div>
         ))}
       </AnimatePresence>

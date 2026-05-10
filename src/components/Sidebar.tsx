@@ -7,32 +7,96 @@ interface SidebarProps {
 }
 
 const tabs = [
-  { id: 'spy' as TabId, icon: 'fa-brands fa-youtube', color: 'red', label: '1. PHÂN TÍCH KÊNH PHẬT PHÁP', desc: 'Phân Tích Kênh Thiền Định & Pháp Thoại', activeColor: 'amber', activeBg: 'amber-400/50', activeText: 'amber-900', inactiveBg: 'white/50', inactiveBorder: 'amber-200/30', inactiveText: 'amber-800/80' },
-  { id: 'script' as TabId, icon: 'fa-solid fa-dharmachakra', color: 'teal', label: '2. VIẾT KỊCH BẢN PHÁP THOẠI', desc: 'Kịch bản giảng Phật pháp & thiền định', activeColor: 'amber', activeBg: 'amber-400/50', activeText: 'amber-900', inactiveBg: 'white/50', inactiveBorder: 'amber-200/30', inactiveText: 'amber-800/80' },
-  { id: 'studio' as TabId, icon: 'fa-solid fa-place-of-worship', color: 'purple', label: '3. STUDIO SÁNG TẠO PHẬT GIÁO', desc: 'Prompt Video & Ảnh Phật Giáo', activeColor: 'purple', activeBg: 'purple-300/50', activeText: 'purple-900', inactiveBg: 'white/50', inactiveBorder: 'amber-200/30', inactiveText: 'amber-800/80' },
+  {
+    id: 'spy' as TabId,
+    icon: 'fa-brands fa-youtube',
+    label: 'PHÂN TÍCH KÊNH',
+    step: '01',
+    desc: 'Phân tích Video Phật Pháp & Thiền Định',
+    accentColor: 'from-red-400 to-orange-500',
+    dotColor: 'bg-red-400',
+    glowColor: 'rgba(239,68,68,0.1)',
+  },
+  {
+    id: 'script' as TabId,
+    icon: 'fa-solid fa-dharmachakra',
+    label: 'VIẾT KỊCH BẢN',
+    step: '02',
+    desc: 'Kịch bản giảng Phật pháp & thiền định',
+    accentColor: 'from-amber-400 to-yellow-500',
+    dotColor: 'bg-amber-400',
+    glowColor: 'rgba(245,158,11,0.1)',
+  },
+  {
+    id: 'studio' as TabId,
+    icon: 'fa-solid fa-place-of-worship',
+    label: 'STUDIO SÁNG TẠO',
+    step: '03',
+    desc: 'Prompt Video & Ảnh Phật Giáo',
+    accentColor: 'from-purple-400 to-indigo-500',
+    dotColor: 'bg-purple-400',
+    glowColor: 'rgba(139,92,246,0.1)',
+  },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   return (
-    <div className="w-full md:w-64 flex md:flex-col gap-2 shrink-0 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-      {tabs.map(tab => {
+    <nav className="sidebar-nav w-full md:w-[280px] flex md:flex-col gap-2.5 shrink-0 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+      {tabs.map((tab, index) => {
         const isActive = activeTab === tab.id;
         return (
           <button key={tab.id} onClick={() => onTabChange(tab.id)}
-            className={`p-5 rounded-2xl text-left border-2 transition-all duration-200 shrink-0 min-w-[200px] md:min-w-0 animate-slide-in ${
-              isActive
-                ? `bg-white/70 backdrop-blur-sm border-amber-400/50 text-amber-900 shadow-[0_2px_12px_rgba(212,165,116,0.2)] hover:bg-white/85 hover:border-amber-500/60`
-                : `bg-white/50 backdrop-blur-sm border-amber-200/30 text-amber-800/80 shadow-[0_2px_8px_rgba(212,165,116,0.1)] hover:bg-white/70 hover:border-orange-300/40 hover:text-amber-900`
-            }`}>
-            <div className={`flex items-center gap-3 mb-2 ${isActive ? 'text-amber-700' : ''}`}>
-              <i className={`${tab.icon} text-xl`}></i>
-              <span className="font-black text-sm">{tab.label}</span>
+            className={`sidebar-tab relative p-4 md:p-[18px] rounded-2xl text-left transition-all duration-300 shrink-0 min-w-[200px] md:min-w-0 group ${
+              isActive ? 'sidebar-tab-active' : 'sidebar-tab-inactive'
+            }`}
+            style={{
+              animationDelay: `${index * 80}ms`,
+              ...(isActive ? { boxShadow: `0 8px 32px ${tab.glowColor}, 0 2px 8px rgba(0,0,0,0.3)` } : {}),
+            }}>
+            {/* Gold Left Bar for Active */}
+            {isActive && (
+              <div className={`absolute top-0 left-0 w-full md:w-[3px] h-[3px] md:h-full rounded-full bg-gradient-to-r md:bg-gradient-to-b ${tab.accentColor}`}></div>
+            )}
+
+            <div className="flex items-center gap-3.5">
+              {/* Icon */}
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                isActive
+                  ? `bg-gradient-to-br ${tab.accentColor} text-white shadow-lg`
+                  : 'bg-white/[0.04] text-[#ECE6D8]/30 group-hover:bg-white/[0.06] group-hover:text-[#ECE6D8]/50'
+              }`}>
+                <i className={`${tab.icon} text-base`}></i>
+              </div>
+
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`text-[9px] font-black tracking-widest ${isActive ? 'text-[#D4A574]/80' : 'text-[#D4A574]/25'}`}>
+                    {tab.step}
+                  </span>
+                  {/* Pulsing active dot */}
+                  {isActive && (
+                    <div className={`w-1.5 h-1.5 rounded-full ${tab.dotColor}`}
+                      style={{ animation: 'activeDotPulse 2s ease-in-out infinite' }} />
+                  )}
+                  <span className={`font-extrabold text-[11px] tracking-wide truncate ${isActive ? 'text-[#ECE6D8]' : 'text-[#ECE6D8]/35 group-hover:text-[#ECE6D8]/55'}`}>
+                    {tab.label}
+                  </span>
+                </div>
+                <p className={`text-[10px] leading-relaxed truncate ${isActive ? 'text-[#ECE6D8]/45' : 'text-[#ECE6D8]/20 group-hover:text-[#ECE6D8]/30'}`}>
+                  {tab.desc}
+                </p>
+              </div>
+
+              {/* Active chevron */}
+              {isActive && (
+                <i className="fa-solid fa-chevron-right text-[8px] text-[#D4A574]/40 hidden md:block"></i>
+              )}
             </div>
-            <p className="text-[10px] opacity-60">{tab.desc}</p>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 };
 
