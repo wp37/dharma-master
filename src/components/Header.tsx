@@ -1,66 +1,53 @@
 import React from 'react';
-import { KeyIcon } from './Icons';
+import type { TabId } from '../data/constants';
 
 interface HeaderProps {
   uiLang: 'vi' | 'en';
   onToggleLang: () => void;
-  onOpenApiKey: () => void;
-  hasApiKey: boolean;
+  onOpenConfig: () => void;
+  keyCount: number;
 }
 
-const Header: React.FC<HeaderProps> = ({ uiLang, onToggleLang, onOpenApiKey, hasApiKey }) => {
+const Header: React.FC<HeaderProps> = ({ uiLang, onToggleLang, onOpenConfig, keyCount }) => {
   return (
-    <header className="relative bg-black/30 backdrop-blur-2xl border-b border-white/[0.04] sticky top-0 z-50">
-      {/* Glowing top accent line */}
-      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#D4A574]/40 to-transparent" />
-
+    <header className="bg-[#0f0c05]/95 backdrop-blur-md border-b border-yellow-900/20 sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.9)]">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-3 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-[#D4A574]/90 via-[#D89B6A]/85 to-[#C17D4A]/90 p-2.5 rounded-2xl shadow-[0_0_24px_rgba(212,165,116,0.2)] border border-[#D4A574]/20 relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <i className="fa-solid fa-spa text-white text-lg drop-shadow-md relative z-10"></i>
+          <div className="bg-gradient-to-r from-yellow-900 to-slate-900 p-2 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.3)] border border-yellow-500/20">
+            <i className="fa-solid fa-dharmachakra text-yellow-100 text-lg pulse-glow"></i>
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-black tracking-tight font-display">
-              <span className="text-[#ECE6D8] drop-shadow-sm">TUAI</span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4A574] via-[#D89B6A] to-[#C17D4A]"> DHARMA MASTER</span>
+            <h1 className="text-lg md:text-xl font-black tracking-tighter text-yellow-50">
+              TUAI <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-amber-400">DHARMA MASTER</span>
             </h1>
-            <p className="text-[9px] md:text-[10px] text-[#D4A574]/40 tracking-[0.15em] font-semibold mt-0.5">V1.0 • PHẬT PHÁP & TRÍ TUỆ GIÁC NGỘ ✨</p>
+            <p className="text-[9px] text-yellow-500/80 tracking-widest font-mono font-bold">V50.0 • PHẬT PHÁP & TRÍ TUỆ GIÁC NGỘ ✨</p>
           </div>
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* API Key Settings Button */}
-          <button onClick={onOpenApiKey}
-            className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5 rounded-xl text-xs font-bold transition-all duration-300 border group relative overflow-hidden ${
-              hasApiKey
-                ? 'bg-green-500/[0.08] border-green-500/20 hover:bg-green-500/[0.12] hover:border-green-500/30'
-                : 'bg-red-500/[0.08] border-red-500/20 hover:bg-red-500/[0.12] hover:border-red-500/30'
-            }`}>
-            <div className={`w-2 h-2 rounded-full ${hasApiKey ? 'bg-green-400 animate-pulse' : 'bg-red-400 animate-pulse'}`}></div>
-            <KeyIcon className={`w-3.5 h-3.5 ${hasApiKey ? 'text-green-400' : 'text-red-400'}`} />
-            <span className={`hidden md:inline ${hasApiKey ? 'text-green-300' : 'text-red-300 font-extrabold'}`}>
-              {hasApiKey ? 'API Key ✓' : 'Lấy API Key để sử dụng app'}
-            </span>
-            <span className={`md:hidden ${hasApiKey ? 'text-green-300' : 'text-red-300'}`}>
-              {hasApiKey ? '✓' : 'API Key'}
-            </span>
-          </button>
-
-          {/* Support */}
+        <div className="flex items-center gap-2 md:gap-4">
           <a href="https://zalo.me/0814666040" target="_blank" rel="noopener noreferrer"
-            className="hidden lg:flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-teal-400/[0.06] text-teal-300/70 border border-teal-400/10 hover:bg-teal-400/[0.1] hover:border-teal-400/20 hover:text-teal-200 transition-all duration-300 group">
-            <i className="fa-solid fa-headset text-teal-400/60"></i>
-            <span>Hỗ trợ: 0814666040</span>
+            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-yellow-900/20 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-900/30 transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)] group">
+            <i className="fa-solid fa-headset pulse-glow"></i>
+            <span className="group-hover:scale-105 transition-transform">Hỗ trợ: 08.14.666.040</span>
           </a>
 
-          {/* Language Toggle */}
+          {/* Language Switcher */}
           <button onClick={onToggleLang}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/[0.04] text-[#ECE6D8]/60 border border-white/[0.06] hover:bg-white/[0.07] hover:border-[#D4A574]/15 hover:text-[#ECE6D8]/80 transition-all duration-300">
+            className="flex items-center gap-2 px-3 py-2 rounded-full text-xs font-bold bg-[#1a1508] text-slate-300 border border-white/10 hover:bg-[#2a2510] transition-all hover:text-white">
             <span>{uiLang === 'vi' ? '🇻🇳' : '🇺🇸'}</span>
             <span>{uiLang === 'vi' ? 'VI' : 'EN'}</span>
+          </button>
+
+          {/* Config Button */}
+          <button onClick={onOpenConfig}
+            className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-full text-xs font-bold bg-[#1a1508] text-yellow-200/50 border border-yellow-900/30 hover:bg-[#2a2510] transition-all hover:text-yellow-200">
+            <i className="fa-solid fa-key"></i>
+            <span className="hidden md:inline">Config</span>
+            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${keyCount > 0 ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-slate-800 text-slate-400'}`}>
+              {keyCount}
+            </span>
           </button>
         </div>
       </div>

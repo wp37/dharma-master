@@ -1,191 +1,138 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { LoaderIcon, ChevronDownIcon } from '../components/Icons';
-import { callGemini } from '../services/geminiService';
-import { PROMPT_SCRIPT_WRITER } from '../data/prompts';
-import { CONTEXT_LIST } from '../data/buddhismContexts';
-import { VISUAL_STYLES } from '../data/visualStyles';
+import { callAI } from '../services/aiService';
+import { SYSTEM_PROMPT_SCRIPT_WRITER } from '../data/prompts';
+import { BUDDHISM_CONTEXTS, VISUAL_STYLES, SECONDS_PER_SCENE } from '../data/constants';
 import { showToast } from '../components/Toast';
 
-interface ScriptModuleProps {
-  onScriptGenerated: (script: any) => void;
-}
+interface Props { onScriptGenerated: (segments: any[], style: string) => void; initialTopic?: string; }
 
-const ease = [0.22, 1, 0.36, 1] as const;
-
-const ScriptModule: React.FC<ScriptModuleProps> = ({ onScriptGenerated }) => {
-  const [topic, setTopic] = useState('');
+const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' }) => {
+  const [topic, setTopic] = useState(initialTopic);
   const [duration, setDuration] = useState(1);
-  const [selectedContext, setSelectedContext] = useState(CONTEXT_LIST[0]);
-  const [selectedStyle, setSelectedStyle] = useState(VISUAL_STYLES[0]);
-  const [contextOpen, setContextOpen] = useState(false);
-  const [styleOpen, setStyleOpen] = useState(false);
+  const [market, setMarket] = useState('vn_mahayana');
+  const [style, setStyle] = useState('auto');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [segments, setSegments] = useState<any[]>([]);
 
-  const estimatedScenes = Math.ceil(duration * 60 / 8);
-  const estimatedWords = Math.ceil(duration * 130);
+  React.useEffect(() => { if (initialTopic) setTopic(initialTopic); }, [initialTopic]);
+
+  const scenes = Math.ceil((Math.max(0.1, duration) * 60) / SECONDS_PER_SCENE);
+  const mode = duration < 3 ? { name: '🟢 DAILY DHARMA (<3m)', wpm: 130 } : duration <= 10 ? { name: '🔵 SUTRA STUDY (3-10m)', wpm: 140 } : { name: '🟣 EPIC JOURNEY (>10m)', wpm: 120 };
+  const words = Math.floor(duration * mode.wpm);
+  const modeColor = duration < 3 ? 'text-green-400 border-green-500/50 bg-green-900/10' : duration <= 10 ? 'text-blue-400 border-blue-500/50 bg-blue-900/10' : 'text-purple-400 border-purple-500/50 bg-purple-900/10';
 
   const handleGenerate = async () => {
-    if (!topic.trim()) { showToast('Vui lòng nhập chủ đề Phật pháp.', 'error'); return; }
-    setLoading(true); setResult(null);
+    if (!topic) return showToast('Nhập chủ đề Phật pháp!');
+    setLoading(true);
     try {
-      const prompt = PROMPT_SCRIPT_WRITER(topic, duration, selectedContext, selectedStyle, '');
-      const data = await callGemini(prompt);
-      setResult(data);
-      if (data) onScriptGenerated(data);
-    } catch (e: any) {
-      showToast(e.message || 'Lỗi khi tạo kịch bản.', 'error');
-    } finally { setLoading(false); }
+      const styleObj = VISUAL_STYLES.find(s => s.id === style);
+      const mk = BUDDHISM_CONTEXTS[market] || BUDDHISM_CONTEXTS['vn_mahayana'];
+      const prompt = `TOPIC: "${topic}"\nDURATION: ${duration}m\nSCENE_COUNT: ${scenes}\nTARGET_LANGUAGE: ${mk.voice_lang}\nTARGET_MARKET: ${mk.name}\nTRADITION: ${mk.tradition}\nKEY_PRACTICES: ${mk.key_practices}\nPHILOSOPHY: ${mk.philosophy}\nWRITING_STYLE: ${mk.writing_style}\nHUMAN_ELEMENT: ${mk.human_element}\nCULTURE: ${mk.culture}\nVISUAL_STYLE: ${styleObj?.name || 'Auto'}\nGENERATE JSON OBJECT.`;
+      const json = await callAI(prompt, SYSTEM_PROMPT_SCRIPT_WRITER);
+      let segs = json.script || (Array.isArray(json) ? json : []);
+      let enforce = '';
+      if (styleObj && styleObj.id !== 'auto') enforce = styleObj.prompt_enforce;
+      else if (json.suggested_style) enforce = `, Visual Style: ${json.suggested_style}`;
+      if (enforce) {
+        segs = segs.map((s: any) => ({
+          ...s,
+          video_prompt: s.video_prompt?.includes('Visual Style:') ? s.video_prompt : `${s.video_prompt} ${enforce}`,
+          image_prompt: s.image_prompt?.includes('Visual Style:') ? s.image_prompt : `${s.image_prompt} ${enforce}`,
+        }));
+      }
+      setSegments(segs);
+      onScriptGenerated(segs, json.suggested_style || '');
+    } catch (e: any) { showToast(e.message); }
+    finally { setLoading(false); }
   };
 
-  const copyText = (text: string) => {
+  const copyAll = () => {
+    const text = segments.map(s => s.chapter_voice_block || s.voice_text).join('\n\n');
     navigator.clipboard.writeText(text);
-    showToast('Đã sao chép!', 'success');
+    showToast('✅ Đã copy voice toàn bộ!', 'success');
   };
+
+  const markets = Object.values(BUDDHISM_CONTEXTS);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-slide-in">
-      <div className="dharma-card p-6">
-        <h2 className="text-lg font-extrabold text-[#ECE6D8] mb-5 flex items-center gap-2.5 font-display">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-400 flex items-center justify-center shadow-[0_0_16px_rgba(245,158,11,0.15)]">
-            <i className="fa-solid fa-pen-fancy text-white text-sm"></i>
-          </div>
-          Quy Trình Sáng Tạo Kịch Bản Pháp Thoại
-        </h2>
-        <div className="space-y-4 mb-5">
+    <div className="max-w-5xl mx-auto space-y-6 animate-[slideIn_0.4s_ease-out]">
+      <div className="bg-[#0f0f11] border border-white/10 p-6 rounded-2xl shadow-lg">
+        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><i className="fa-solid fa-pen-nib text-yellow-500" /> Soạn Kịch Bản Pháp Thoại</h2>
+        <div className="space-y-4">
           <div>
-            <label className="text-[10px] font-bold text-[#D4A574]/50 uppercase tracking-wider mb-1.5 block">
-              <i className="fa-solid fa-feather mr-1"></i> CHỦ ĐỀ PHẬT PHÁP
-            </label>
-            <input value={topic} onChange={e => setTopic(e.target.value)}
-              placeholder="VD: Tứ Diệu Đế, Thiền Vipassana, Từ Bi Quán..."
-              className="w-full !bg-white/[0.03] !border-white/[0.06] rounded-xl p-3 text-sm text-[#ECE6D8] outline-none focus:!border-[#D4A574]/30 placeholder:text-[#ECE6D8]/20" />
+            <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Chủ Đề Phật Pháp</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-yellow-500/50 placeholder-white/20" placeholder="VD: Tứ Diệu Đế, Thiền Vipassana, Từ Bi Quán..." />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="dharma-card-inner p-4 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-400 to-blue-500 rounded-full"></div>
-              <label className="text-xs font-bold text-[#ECE6D8]/40 uppercase mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-clock text-blue-400/60"></i> THỜI LƯỢNG (PHÚT)
-              </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-[#151515] border border-white/5 rounded-xl p-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/50" />
+              <label className="text-xs font-bold text-slate-400 uppercase mb-3 block flex items-center gap-2"><i className="fa-solid fa-clock text-blue-400" /> THỜI LƯỢNG (PHÚT)</label>
               <div className="flex items-center gap-5">
-                <input type="number" value={duration} onChange={e => setDuration(parseFloat(e.target.value) || 1)}
-                  step="0.5" min="0.5" max="240"
-                  className="w-20 !bg-white/[0.04] !border-white/[0.06] rounded-lg p-3 text-2xl font-black text-[#ECE6D8] text-center outline-none focus:!border-blue-400/30" />
+                <input type="number" value={duration} step={0.5} onChange={e => setDuration(parseFloat(e.target.value) || 1)} className="w-20 bg-black border border-white/10 rounded-lg p-3 text-2xl font-black text-white text-center outline-none" />
                 <div className="flex flex-col gap-1.5 text-xs">
-                  <div><span className="text-[#ECE6D8]/25">Cảnh:</span> <span className="font-bold text-green-400 text-base">~{estimatedScenes}</span></div>
-                  <div><span className="text-[#ECE6D8]/25">Voice:</span> <span className="font-bold text-purple-400 text-base">~{estimatedWords} từ</span></div>
+                  <div><span className="text-slate-500">Số cảnh:</span> <span className="font-bold text-green-400 text-base">~{scenes}</span></div>
+                  <div><span className="text-slate-500">Voice:</span> <span className="font-bold text-purple-400 text-base">~{words} từ</span></div>
                 </div>
               </div>
             </div>
-            <div className="dharma-card-inner p-4">
-              <label className="text-xs font-bold text-[#ECE6D8]/40 uppercase mb-2 flex items-center gap-2">
-                <i className="fa-solid fa-globe text-orange-400/60"></i> TRUYỀN THỐNG
-              </label>
-              <button onClick={() => setContextOpen(!contextOpen)}
-                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 text-left text-sm text-[#ECE6D8]/70 flex items-center justify-between hover:border-[#D4A574]/15 transition-all duration-300">
-                <span>{selectedContext.flag} {selectedContext.name.split('(')[0].trim()}</span>
-                <ChevronDownIcon className={`w-4 h-4 text-[#D4A574]/40 transition-transform duration-300 ${contextOpen ? 'rotate-180' : ''}`} />
-              </button>
-              <AnimatePresence>
-                {contextOpen && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease }}
-                    className="border-t border-white/[0.04] mt-2 max-h-48 overflow-y-auto rounded-xl bg-[#0a0e1a]/80 backdrop-blur-xl">
-                    {CONTEXT_LIST.map(ctx => (
-                      <button key={ctx.id} onClick={() => { setSelectedContext(ctx); setContextOpen(false); }}
-                        className={`w-full text-left p-3 text-xs border-b border-white/[0.03] hover:bg-white/[0.04] transition-colors ${selectedContext.id === ctx.id ? 'text-[#D4A574] bg-[#D4A574]/[0.04] font-bold' : 'text-[#ECE6D8]/50'}`}>
-                        <span className="mr-2">{ctx.flag}</span>{ctx.name}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <div className="bg-[#151515] border border-white/5 rounded-xl p-4">
+              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2"><i className="fa-solid fa-globe text-orange-400" /> TRUYỀN THỐNG</label>
+              <select value={market} onChange={e => setMarket(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none cursor-pointer">
+                {markets.map(m => <option key={m.id} value={m.id}>{m.flag} {m.name}</option>)}
+              </select>
             </div>
           </div>
-          <div className="dharma-card-inner p-4">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-xs font-bold text-[#ECE6D8]/40 uppercase flex items-center gap-2">
-                <i className="fa-solid fa-palette text-pink-400/60"></i> PHONG CÁCH VISUAL
-              </label>
-              <button onClick={() => setStyleOpen(!styleOpen)}
-                className="text-[10px] text-[#D4A574]/50 hover:text-[#D4A574]/80 font-bold transition-colors">
-                {styleOpen ? 'Thu gọn ▲' : `Xem tất cả (${VISUAL_STYLES.length}) ▼`}
-              </button>
-            </div>
-            <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 ${!styleOpen ? 'max-h-[180px] overflow-hidden' : ''}`}>
-              {VISUAL_STYLES.map(style => (
-                <button key={style.id} onClick={() => setSelectedStyle(style)}
-                  className={`text-left p-3 rounded-xl border transition-all duration-300 text-xs ${
-                    selectedStyle.id === style.id
-                      ? 'bg-pink-500/[0.06] border-pink-500/20 text-pink-300/80'
-                      : 'bg-white/[0.02] border-white/[0.04] text-[#ECE6D8]/35 hover:border-pink-500/10'
-                  }`}>
-                  <div className="font-bold mb-0.5 text-[11px] leading-tight">{style.name}</div>
-                  <div className="opacity-50 text-[9px] leading-tight line-clamp-2">{style.desc}</div>
+          <div className={`border rounded-xl p-4 transition-all ${modeColor}`}>
+            <div className="font-bold">{mode.name}</div>
+          </div>
+          <div className="bg-[#151515] border border-white/5 rounded-xl p-4">
+            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2"><i className="fa-solid fa-palette text-pink-400" /> PHONG CÁCH VISUAL</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {VISUAL_STYLES.map(s => (
+                <button key={s.id} onClick={() => setStyle(s.id)}
+                  className={`text-[10px] p-2 rounded border text-left transition-all ${style === s.id ? 'bg-yellow-900/30 border-yellow-500/50 text-white shadow-[0_0_10px_rgba(234,179,8,0.2)]' : 'bg-[#1a1a1a] border-white/5 text-slate-400 hover:bg-[#252525]'}`}>
+                  <div className="font-bold mb-0.5">{s.name}</div>
+                  <div className="text-[9px] opacity-70 truncate">{s.desc}</div>
                 </button>
               ))}
             </div>
           </div>
           <button onClick={handleGenerate} disabled={loading}
-            className="w-full py-4 dharma-btn-primary rounded-xl flex items-center justify-center gap-3 text-base disabled:opacity-40">
-            {loading ? <LoaderIcon className="w-5 h-5 animate-spin" /> : <i className="fa-solid fa-om text-lg"></i>}
-            {loading ? 'Đang viết kịch bản...' : 'VIẾT KỊCH BẢN PHÁP THOẠI'}
+            className="w-full py-4 bg-yellow-900/50 hover:bg-yellow-800/50 border border-yellow-500/30 text-yellow-100 font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+            {loading ? <><i className="fa-solid fa-sync animate-spin" /> ĐANG VIẾT...</> : <><i className="fa-solid fa-om" /> VIẾT KỊCH BẢN PHÁP THOẠI</>}
           </button>
         </div>
       </div>
-
-      {result && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ease }} className="space-y-4 pb-10">
-          <div className="dharma-card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[#ECE6D8]/80 font-bold text-sm flex items-center gap-2">
-                <i className="fa-solid fa-scroll text-[#D4A574]/60"></i> Kịch Bản: {result.mode_detected || topic}
-              </h3>
-              <button onClick={() => copyText(JSON.stringify(result.script, null, 2))}
-                className="px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.06] rounded-lg text-xs text-[#ECE6D8]/50 flex items-center gap-1.5 transition-all font-bold hover:text-[#D4A574]/70">
-                <i className="fa-solid fa-copy"></i> Copy All
-              </button>
-            </div>
-            <div className="space-y-3">
-              {result.script?.map((scene: any, i: number) => (
-                <div key={i} className="dharma-card-inner p-4">
-                  <div className="flex items-center gap-2 mb-3 flex-wrap">
-                    <span className="dharma-tag bg-[#D4A574]/10 text-[#D4A574]/70">Cảnh {scene.scene_number}</span>
-                    <span className="text-[#ECE6D8]/20 text-xs">{scene.time}</span>
-                    <span className="dharma-tag bg-purple-500/10 text-purple-400/70">{scene.section}</span>
-                  </div>
-                  <div className="space-y-2.5">
-                    {scene.voice_text && (
-                      <div className="bg-blue-500/[0.04] border border-blue-500/10 rounded-xl p-3">
-                        <div className="text-[10px] text-blue-400/60 font-bold uppercase mb-1 flex items-center gap-1"><i className="fa-solid fa-microphone"></i> Voice</div>
-                        <p className="text-blue-200/60 text-sm italic leading-relaxed">"{scene.voice_text}"</p>
-                      </div>
-                    )}
-                    {scene.video_prompt && (
-                      <div className="bg-green-500/[0.04] border border-green-500/10 rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-[10px] text-green-400/60 font-bold uppercase flex items-center gap-1"><i className="fa-solid fa-video"></i> Video Prompt</div>
-                          <button onClick={() => copyText(scene.video_prompt)} className="text-green-400/30 hover:text-green-400/60 text-xs transition-colors"><i className="fa-solid fa-copy"></i></button>
-                        </div>
-                        <p className="text-green-200/40 text-xs leading-relaxed">{scene.video_prompt}</p>
-                      </div>
-                    )}
-                    {scene.image_prompt && (
-                      <div className="bg-purple-500/[0.04] border border-purple-500/10 rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="text-[10px] text-purple-400/60 font-bold uppercase flex items-center gap-1"><i className="fa-solid fa-image"></i> Image Prompt</div>
-                          <button onClick={() => copyText(scene.image_prompt)} className="text-purple-400/30 hover:text-purple-400/60 text-xs transition-colors"><i className="fa-solid fa-copy"></i></button>
-                        </div>
-                        <p className="text-purple-200/40 text-xs leading-relaxed">{scene.image_prompt}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+      {segments.length > 0 && (
+        <div className="space-y-4 pb-10">
+          <div className="flex justify-between items-center px-2">
+            <div className="text-xs text-slate-500 font-bold">Đã tạo: {segments.length} phân đoạn</div>
+            <button onClick={copyAll} className="text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 bg-white text-black hover:bg-slate-200"><i className="fa-solid fa-copy" /> Copy Voice Toàn Bộ</button>
           </div>
-        </motion.div>
+          {segments.map((seg, idx) => (
+            <div key={idx} className="bg-[#0f0f11] border border-white/10 p-4 rounded-xl flex flex-col sm:flex-row gap-4 hover:border-yellow-500/30 transition-colors relative">
+              <div className="w-full sm:w-24 shrink-0 text-center pt-1 border-r border-white/5 pr-2">
+                <div className="text-[10px] bg-[#1a1a1a] px-2 py-1 rounded font-bold text-white mb-1">SCENE {seg.scene_number || idx + 1}</div>
+                <div className="text-[9px] text-slate-500 font-mono mb-1">{seg.time}</div>
+                <div className="text-[9px] text-yellow-400 font-bold uppercase break-words">{seg.section}</div>
+              </div>
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-[#151515]/50 p-3 rounded border border-white/5">
+                  <div className="text-[10px] text-blue-400 font-bold flex items-center gap-1 mb-1"><i className="fa-solid fa-eye" /> VISUAL</div>
+                  <p className="text-xs text-slate-300 mb-2">{seg.visual_desc_vi || seg.visual_desc || ''}</p>
+                  {seg.strategy_note && <div className="mt-2 p-2 rounded bg-yellow-900/10 border border-yellow-500/20 text-[10px] text-yellow-200/80 italic">💡 {seg.strategy_note}</div>}
+                </div>
+                <div className="bg-[#151515]/50 p-3 rounded border border-white/5">
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="text-[10px] text-purple-400 font-bold flex items-center gap-1"><i className="fa-solid fa-microphone-alt" /> VOICE</div>
+                    <button onClick={() => { navigator.clipboard.writeText(seg.voice_text || ''); showToast('✅ Copied!', 'success'); }} className="text-slate-500 hover:text-white"><i className="fa-regular fa-copy" /></button>
+                  </div>
+                  <p className="text-sm text-indigo-100 font-medium italic leading-relaxed text-justify">"{seg.chapter_voice_block || seg.voice_text || '(Đọc tiếp...)'}"</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

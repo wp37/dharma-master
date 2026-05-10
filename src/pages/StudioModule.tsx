@@ -1,145 +1,122 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CopyIcon } from '../components/Icons';
+import { generateImage } from '../services/aiService';
 import { showToast } from '../components/Toast';
 
-interface StudioModuleProps {
-  currentScript: any;
+interface Props { segments: any[]; }
+
+function downloadFile(content: string, fileName: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
-const StudioModule: React.FC<StudioModuleProps> = ({ currentScript }) => {
+const StudioModule: React.FC<Props> = ({ segments }) => {
   const [mode, setMode] = useState<'video' | 'image'>('video');
+  const [media, setMedia] = useState<Record<string, string>>({});
+  const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
   const [showExport, setShowExport] = useState(false);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showToast('Đã sao chép!', 'success');
+  const copy = (t: string) => { navigator.clipboard.writeText(t); showToast('✅ Copied!', 'success'); };
+
+  const genMedia = async (idx: number) => {
+    if (loadingIdx !== null) return;
+    setLoadingIdx(idx);
+    try {
+      const seg = segments[idx];
+      let prompt = mode === 'video' ? seg.video_prompt : seg.image_prompt;
+      prompt += mode === 'video' ? ', 8k, cinematic lighting --no text' : ', masterpiece, 8k';
+      const result = await generateImage(prompt, mode === 'video' ? '16:9' : '1:1');
+      if (result) { setMedia(prev => ({ ...prev, [`${idx}_${mode}`]: result })); }
+      else showToast('Lỗi Safety/API. Thử prompt khác.');
+    } catch (e: any) { showToast(e.message); }
+    finally { setLoadingIdx(null); }
   };
 
-  const exportCSV = (type: 'video' | 'image') => {
-    if (!currentScript?.script) { showToast('Chưa có kịch bản.', 'error'); return; }
-    let csv = 'Scene,Time,Section';
-    csv += type === 'video' ? ',Video Prompt\n' : ',Image Prompt\n';
-    currentScript.script.forEach((s: any) => {
-      const prompt = type === 'video' ? (s.video_prompt || '') : (s.image_prompt || '');
-      csv += `${s.scene_number},"${s.time}","${s.section}","${prompt.replace(/"/g, '""')}"\n`;
+  const exportCSV = () => {
+    if (!segments.length) return;
+    let csv = '\uFEFFScene,Time,Section,Voice,Video Prompt,Image Prompt\n';
+    segments.forEach((s, i) => {
+      csv += `${i + 1},"${s.time}","${s.section}","${(s.voice_text || '').replace(/"/g, '""')}","${(s.video_prompt || '').replace(/"/g, '""')}","${(s.image_prompt || '').replace(/"/g, '""')}"\n`;
     });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `dharma_${type}_prompts_${Date.now()}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    showToast('Đã tải file CSV!', 'success');
+    downloadFile(csv, `dharma_script_${Date.now()}.csv`, 'text/csv;charset=utf-8;');
     setShowExport(false);
   };
 
-  const exportTXT = (type: 'video' | 'image') => {
-    if (!currentScript?.script) { showToast('Chưa có kịch bản.', 'error'); return; }
-    let txt = '=== DHARMA MASTER PROMPTS ===\n\n';
-    currentScript.script.forEach((s: any) => {
-      const prompt = type === 'video' ? (s.video_prompt || '') : (s.image_prompt || '');
-      txt += `[Scene ${s.scene_number}] ${s.time} - ${s.section}\n${prompt}\n\n`;
-    });
-    const blob = new Blob([txt], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `dharma_${type}_prompts_${Date.now()}.txt`; a.click();
-    URL.revokeObjectURL(url);
-    showToast('Đã tải file TXT!', 'success');
+  const exportPrompts = (type: 'video' | 'image', format: 'csv' | 'txt') => {
+    if (!segments.length) return;
+    if (format === 'csv') {
+      let csv = `\uFEFFScene,${type} Prompt\n`;
+      segments.forEach((s, i) => { csv += `${i + 1},"${((type === 'video' ? s.video_prompt : s.image_prompt) || '').replace(/"/g, '""')}"\n`; });
+      downloadFile(csv, `prompts_${type}_${Date.now()}.csv`, 'text/csv;charset=utf-8;');
+    } else {
+      const content = segments.map(s => (type === 'video' ? s.video_prompt : s.image_prompt) || '').filter(Boolean).join('\n\n');
+      downloadFile(content, `prompts_${type}_${Date.now()}.txt`, 'text/plain;charset=utf-8;');
+    }
     setShowExport(false);
   };
+
+  if (!segments.length) return (
+    <div className="h-full flex flex-col items-center justify-center animate-[slideIn_0.4s_ease-out]">
+      <div className="text-center text-slate-500 py-10 italic">Chưa có dữ liệu kịch bản.<br/>Hãy tạo kịch bản ở tab <strong>"Pháp Thoại"</strong> trước.</div>
+    </div>
+  );
 
   return (
-    <div className="h-full flex flex-col animate-slide-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
-        <h2 className="text-lg font-extrabold text-[#ECE6D8] flex items-center gap-2.5 font-display">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-400 to-indigo-400 flex items-center justify-center shadow-[0_0_16px_rgba(139,92,246,0.15)]">
-            <i className="fa-solid fa-clapperboard text-white text-sm"></i>
-          </div>
-          Studio Sáng Tạo Phật Giáo
-        </h2>
+    <div className="flex flex-col h-full animate-[slideIn_0.4s_ease-out]">
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2"><i className="fa-solid fa-place-of-worship text-purple-500" /> Studio Sáng Tạo Phật Giáo</h2>
         <div className="flex items-center gap-2">
-          <div className="flex bg-white/[0.03] rounded-xl p-1 border border-white/[0.06]">
-            <button onClick={() => setMode('video')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all duration-300 ${
-                mode === 'video' ? 'bg-cyan-500/[0.08] text-cyan-300 border border-cyan-500/20' : 'text-[#ECE6D8]/30 hover:text-[#ECE6D8]/50'
-              }`}>
-              <i className="fa-solid fa-video"></i> VIDEO
-            </button>
-            <button onClick={() => setMode('image')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all duration-300 ${
-                mode === 'image' ? 'bg-purple-500/[0.08] text-purple-300 border border-purple-500/20' : 'text-[#ECE6D8]/30 hover:text-[#ECE6D8]/50'
-              }`}>
-              <i className="fa-solid fa-image"></i> ẢNH
-            </button>
+          <div className="flex bg-[#1a1a1a] rounded p-1 border border-white/5">
+            <button onClick={() => setMode('video')} className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-colors ${mode === 'video' ? 'bg-cyan-900/50 text-cyan-100 shadow' : 'text-slate-400 hover:text-white'}`}><i className="fa-solid fa-video" /> VIDEO</button>
+            <button onClick={() => setMode('image')} className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-colors ${mode === 'image' ? 'bg-purple-900/50 text-purple-100 shadow' : 'text-slate-400 hover:text-white'}`}><i className="fa-solid fa-image" /> ẢNH</button>
           </div>
           <div className="relative">
-            <button onClick={() => setShowExport(!showExport)}
-              className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-300 bg-green-500/[0.06] text-green-300/70 hover:bg-green-500/[0.1] border border-green-500/15">
-              <i className="fa-solid fa-download"></i> Tải <i className="fa-solid fa-chevron-down text-[10px]"></i>
-            </button>
-            <AnimatePresence>
-              {showExport && (
-                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                  className="absolute right-0 top-full mt-2 w-52 bg-[#0a0e1a]/95 backdrop-blur-2xl border border-white/[0.06] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
-                  <button onClick={() => exportCSV('video')} className="w-full text-left px-4 py-2.5 text-xs text-[#ECE6D8]/50 hover:bg-white/[0.04] hover:text-green-300 border-b border-white/[0.03] flex items-center gap-2 transition-colors">
-                    <i className="fa-solid fa-file-excel text-green-400/50"></i> CSV Video Prompts
-                  </button>
-                  <button onClick={() => exportCSV('image')} className="w-full text-left px-4 py-2.5 text-xs text-[#ECE6D8]/50 hover:bg-white/[0.04] hover:text-purple-300 border-b border-white/[0.03] flex items-center gap-2 transition-colors">
-                    <i className="fa-solid fa-file-excel text-purple-400/50"></i> CSV Image Prompts
-                  </button>
-                  <button onClick={() => exportTXT('video')} className="w-full text-left px-4 py-2.5 text-xs text-[#ECE6D8]/50 hover:bg-white/[0.04] hover:text-green-300 border-b border-white/[0.03] flex items-center gap-2 transition-colors">
-                    <i className="fa-regular fa-file-lines text-green-400/50"></i> TXT Video Prompts
-                  </button>
-                  <button onClick={() => exportTXT('image')} className="w-full text-left px-4 py-2.5 text-xs text-[#ECE6D8]/50 hover:bg-white/[0.04] hover:text-purple-300 flex items-center gap-2 transition-colors">
-                    <i className="fa-regular fa-file-lines text-purple-400/50"></i> TXT Image Prompts
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <button onClick={() => setShowExport(!showExport)} className="px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-green-900/40 text-green-300 hover:bg-green-800/50 border border-green-500/20"><i className="fa-solid fa-download" /> Tải <i className="fa-solid fa-chevron-down text-[10px]" /></button>
+            {showExport && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button onClick={exportCSV} className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-white/5 border-b border-white/5 flex items-center gap-2"><i className="fa-solid fa-file-excel text-green-500" /> Excel Kịch Bản</button>
+                <button onClick={() => exportPrompts('video', 'csv')} className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-white/5 border-b border-white/5 flex items-center gap-2"><i className="fa-solid fa-file-video text-cyan-500" /> Excel Video</button>
+                <button onClick={() => exportPrompts('image', 'csv')} className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-white/5 border-b border-white/5 flex items-center gap-2"><i className="fa-solid fa-file-image text-purple-500" /> Excel Ảnh</button>
+                <button onClick={() => exportPrompts('video', 'txt')} className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-white/5 border-b border-white/5 flex items-center gap-2"><i className="fa-regular fa-file-lines text-cyan-500" /> TXT Video</button>
+                <button onClick={() => exportPrompts('image', 'txt')} className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-white/5 flex items-center gap-2"><i className="fa-regular fa-file-lines text-purple-500" /> TXT Ảnh</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      <div className="flex-1 overflow-y-auto space-y-3 pb-10">
-        {!currentScript?.script ? (
-          <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-[#ECE6D8]/20 py-20 border border-dashed border-white/[0.06] rounded-2xl bg-white/[0.01]">
-            <div className="w-16 h-16 rounded-2xl bg-white/[0.03] flex items-center justify-center mb-4 animate-float">
-              <i className="fa-solid fa-scroll text-3xl text-[#D4A574]/20"></i>
-            </div>
-            <p className="text-sm text-center leading-relaxed">
-              Chưa có dữ liệu kịch bản.<br/>
-              Hãy tạo kịch bản ở tab <strong className="text-[#D4A574]/60">"Viết Kịch Bản"</strong> trước.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {currentScript.script.map((scene: any, i: number) => {
-              const prompt = mode === 'video' ? scene.video_prompt : scene.image_prompt;
-              if (!prompt) return null;
-              return (
-                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, ease: [0.22, 1, 0.36, 1] }}
-                  className="dharma-card overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04] bg-white/[0.02]">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="dharma-tag bg-[#D4A574]/10 text-[#D4A574]/70">#{scene.scene_number}</span>
-                      <span className="text-[#ECE6D8]/20 text-xs">{scene.time}</span>
-                      <span className="dharma-tag bg-purple-500/10 text-purple-400/70">{scene.section}</span>
+      <div className="flex-1 overflow-y-auto space-y-4 pb-10">
+        {segments.map((seg, idx) => {
+          const prompt = mode === 'video' ? seg.video_prompt : seg.image_prompt;
+          const result = media[`${idx}_${mode}`];
+          return (
+            <div key={idx} className="bg-[#0f0f11] border border-white/10 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-start hover:border-white/20 transition-colors">
+              <div className={`px-3 py-1.5 rounded text-xs font-bold text-white h-fit shadow-lg ${mode === 'video' ? 'bg-cyan-900/50' : 'bg-purple-900/50'}`}>SCENE {idx + 1}</div>
+              <div className="flex-1 w-full">
+                <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">{mode === 'video' ? '🎬 VIDEO PROMPT' : '🖼️ IMAGE PROMPT'}</div>
+                <div className="relative group">
+                  <p className="text-xs text-slate-300 font-mono mb-3 bg-black/50 p-3 rounded border border-white/5 leading-relaxed pr-10">{prompt || 'No prompt'}</p>
+                  <button onClick={() => copy(prompt || '')} className="absolute top-2 right-2 p-1.5 bg-[#1a1a1a] text-slate-300 rounded hover:bg-yellow-900/50 hover:text-white border border-white/5"><i className="fa-solid fa-copy" /></button>
+                </div>
+                <button onClick={() => genMedia(idx)} disabled={loadingIdx !== null}
+                  className={`px-3 py-1.5 rounded border text-xs font-bold flex items-center gap-1 transition-colors disabled:opacity-50 ${mode === 'video' ? 'bg-cyan-900/20 text-cyan-400 border-cyan-500/20' : 'bg-purple-900/20 text-purple-400 border-purple-500/20'}`}>
+                  {loadingIdx === idx ? <><i className="fa-solid fa-sync animate-spin" /> Đang tạo...</> : <><i className="fa-solid fa-magic" /> Tạo {mode === 'video' ? 'Video' : 'Ảnh'}</>}
+                </button>
+              </div>
+              <div className={`w-full sm:w-64 bg-black rounded border border-white/10 overflow-hidden shrink-0 flex items-center justify-center ${mode === 'video' ? 'aspect-video' : 'aspect-square'}`}>
+                {result ? (
+                  <div className="relative group w-full h-full">
+                    <img src={result} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <a href={result} download={`dharma_scene_${idx}.png`} className="px-3 py-1.5 bg-white text-black rounded text-xs font-bold flex items-center gap-1"><i className="fa-solid fa-cloud-download-alt" /> Tải</a>
                     </div>
-                    <button onClick={() => copyToClipboard(prompt)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.06] rounded-lg text-xs text-[#ECE6D8]/40 transition-all font-bold hover:text-[#D4A574]/70">
-                      <CopyIcon className="w-3 h-3" /> Copy
-                    </button>
                   </div>
-                  <div className="p-4">
-                    <p className="text-[#ECE6D8]/50 text-sm leading-relaxed">{prompt}</p>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
+                ) : (
+                  <div className="text-center p-4"><i className={`fa-solid ${mode === 'video' ? 'fa-film' : 'fa-image'} text-2xl mb-2 opacity-50`} /><div className="text-[10px] text-slate-500">Chưa có dữ liệu</div></div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

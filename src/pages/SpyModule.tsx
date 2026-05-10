@@ -1,172 +1,59 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { LoaderIcon } from '../components/Icons';
-import { fetchYoutubeMeta } from '../services/geminiService';
-import { callGemini } from '../services/geminiService';
-import { PROMPT_SPY } from '../data/prompts';
+import { callAI, fetchYoutubeMeta } from '../services/aiService';
+import { SYSTEM_PROMPT_IQ160_SPY } from '../data/prompts';
 import { showToast } from '../components/Toast';
 
-const SpyModule: React.FC = () => {
+interface SpyModuleProps { onUseStrategy?: (title: string) => void; }
+
+const SpyModule: React.FC<SpyModuleProps> = ({ onUseStrategy }) => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [meta, setMeta] = useState<{ title: string; author: string; thumb: string } | null>(null);
+  const [meta, setMeta] = useState<any>(null);
+
+  const copy = (t: string) => { navigator.clipboard.writeText(t); showToast('✅ Đã copy!', 'success'); };
+  const impactColor = (i: string) => { const s = (i||'').toLowerCase(); return s.includes('high') ? 'text-red-400 font-bold' : s.includes('medium') ? 'text-yellow-400' : 'text-green-400'; };
+  const tierColor = (t: string) => { const s = (t||'').toLowerCase(); return s.includes('premium') ? 'bg-green-900/20 border-green-500/30 text-green-300' : s.includes('high') ? 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300' : 'bg-red-900/20 border-red-500/30 text-red-300'; };
 
   const handleAnalyze = async () => {
-    if (!url.trim()) { showToast('Vui lòng nhập link video YouTube.', 'error'); return; }
+    if (!url) return showToast('Nhập link YouTube!');
     setLoading(true);
-    setResult(null);
     try {
-      const videoMeta = await fetchYoutubeMeta(url);
-      setMeta(videoMeta);
-      const data = await callGemini(
-        `Phân tích video: ${videoMeta.title} bởi ${videoMeta.author}\nURL: ${url}`,
-        PROMPT_SPY
-      );
-      setResult(data);
-    } catch (e: any) {
-      showToast(e.message || 'Lỗi khi phân tích video.', 'error');
-    } finally {
-      setLoading(false);
-    }
+      const m = await fetchYoutubeMeta(url); setMeta(m);
+      let prompt = `URL: ${url}\nMETADATA: Title="${m.title}", Channel="${m.author}"`;
+      if (m.fullData) prompt += `\nDESCRIPTION: ${m.description}\nTAGS: ${m.tags}\nSTATS: ${m.viewCount} views, ${m.likeCount} likes.`;
+      prompt += `\nANALYZE BUDDHIST DHARMA CONTENT based on this metadata.`;
+      setResult(await callAI(prompt, SYSTEM_PROMPT_IQ160_SPY));
+    } catch (e: any) { showToast(e.message); } finally { setLoading(false); }
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-slide-in">
-      {/* Input Card */}
-      <div className="dharma-card p-6">
-        <h2 className="text-lg font-extrabold text-[#ECE6D8] mb-4 flex items-center gap-2.5 font-display">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-400 to-orange-400 flex items-center justify-center shadow-[0_0_16px_rgba(239,68,68,0.15)]">
-            <i className="fa-brands fa-youtube text-white text-sm"></i>
-          </div>
-          Phân Tích Kênh Phật Pháp & Thiền Định
-        </h2>
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <input value={url} onChange={e => setUrl(e.target.value)}
-              placeholder="Dán link Video Phật Pháp / Thiền Định / Pháp Thoại..."
-              className="flex-1 !bg-white/[0.03] !border-white/[0.06] rounded-xl p-3 text-sm text-[#ECE6D8] outline-none focus:!border-[#D4A574]/30 placeholder:text-[#ECE6D8]/20"
-              onKeyDown={e => e.key === 'Enter' && handleAnalyze()} />
-            <button onClick={() => { setUrl(''); setResult(null); setMeta(null); }}
-              className="p-3 bg-white/[0.03] rounded-xl hover:bg-white/[0.06] border border-white/[0.04] hover:border-white/[0.08] transition-all duration-300">
-              <i className="fa-solid fa-trash text-[#ECE6D8]/20 hover:text-red-400/60"></i>
-            </button>
-          </div>
-          <button onClick={handleAnalyze} disabled={loading}
-            className="w-full py-4 dharma-btn-primary rounded-xl flex items-center justify-center gap-2.5 text-sm disabled:opacity-40">
-            {loading ? <LoaderIcon className="w-5 h-5 animate-spin" /> : <i className="fa-solid fa-dharmachakra text-lg"></i>}
-            {loading ? 'Đang phân tích...' : 'PHÂN TÍCH PHÁP MÔN'}
-          </button>
+    <div className="max-w-5xl mx-auto space-y-6 animate-[slideIn_0.4s_ease-out]">
+      <div className="bg-[#0f0f11] border border-white/10 p-6 rounded-2xl shadow-lg">
+        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><i className="fa-brands fa-youtube text-red-500" /> Phân Tích Kênh Phật Pháp & Thiền Định</h2>
+        <div className="flex gap-2 mb-4">
+          <input value={url} onChange={e => setUrl(e.target.value)} placeholder="Dán link Video Phật Pháp / Thiền Định..." className="flex-1 bg-black border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-yellow-500/50 placeholder-white/20" />
+          <button onClick={() => { setUrl(''); setResult(null); setMeta(null); }} className="p-3 bg-[#1a1a1a] rounded-xl hover:bg-[#252525] border border-white/5"><i className="fa-solid fa-trash text-slate-400" /></button>
         </div>
+        <button onClick={handleAnalyze} disabled={loading} className="w-full py-4 bg-yellow-900/40 hover:bg-yellow-800/40 border border-yellow-500/30 text-yellow-100 font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+          {loading ? <><i className="fa-solid fa-sync animate-spin" /> ĐANG PHÂN TÍCH...</> : <><i className="fa-solid fa-dharmachakra" /> PHÂN TÍCH PHÁP MÔN</>}
+        </button>
       </div>
-
-      {/* Video Meta Preview */}
-      {meta && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ ease: [0.22, 1, 0.36, 1] }}
-          className="dharma-card p-4 flex gap-4">
-          <img src={meta.thumb} alt={meta.title}
-            className="w-36 h-22 object-cover rounded-xl border border-white/[0.06] shadow-sm"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[#ECE6D8] font-bold text-sm leading-snug line-clamp-2">{meta.title}</h3>
-            <p className="text-[#ECE6D8]/30 text-xs mt-1 flex items-center gap-1">
-              <i className="fa-solid fa-user text-[10px]"></i> {meta.author}
-            </p>
+      {meta && result && (
+        <div className="space-y-6 pb-10">
+          <div className="bg-[#0f0f11] border border-white/10 p-4 rounded-xl flex gap-4 items-start flex-col sm:flex-row shadow-lg">
+            {meta.thumb && <img src={meta.thumb} className="w-full sm:w-48 rounded-lg shadow-lg border border-white/10 object-cover aspect-video" />}
+            <div className="flex-1"><h3 className="text-lg font-bold text-white leading-tight mb-2">{meta.title}</h3><div className="flex items-center gap-4 text-sm text-slate-400"><span className="flex items-center gap-1 text-yellow-200"><i className="fa-solid fa-user" /> {meta.author}</span>{meta.fullData && <span className="flex items-center gap-1 text-green-200"><i className="fa-solid fa-eye" /> {meta.viewCount} views</span>}</div></div>
           </div>
-        </motion.div>
-      )}
-
-      {/* Analysis Results */}
-      {result && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ ease: [0.22, 1, 0.36, 1] }}
-          className="space-y-4 pb-10">
-          {/* SEO & Strategy */}
-          {result.meta_seo && (
-            <div className="dharma-card p-5">
-              <h3 className="text-[#ECE6D8]/80 font-bold text-sm mb-3.5 flex items-center gap-2">
-                <i className="fa-solid fa-chart-line text-[#D4A574]/60"></i> SEO & Chiến Lược
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                <div className="dharma-card-inner p-3">
-                  <span className="text-[#ECE6D8]/30">Authentic Score:</span>{' '}
-                  <span className="text-green-400 font-bold">{result.meta_seo.authenticity_score}/10</span>
-                </div>
-                <div className="dharma-card-inner p-3">
-                  <span className="text-[#ECE6D8]/30">Commercial Risk:</span>{' '}
-                  <span className={`font-bold ${result.meta_seo.commercialization_risk === 'Low' ? 'text-green-400' : result.meta_seo.commercialization_risk === 'High' ? 'text-red-400' : 'text-yellow-400'}`}>
-                    {result.meta_seo.commercialization_risk}
-                  </span>
-                </div>
-                <div className="sm:col-span-2 dharma-card-inner p-3">
-                  <span className="text-[#ECE6D8]/30">Title Structure:</span>{' '}
-                  <span className="text-[#ECE6D8]/70 font-medium">{result.meta_seo.title_structure}</span>
-                </div>
-                <div className="sm:col-span-2 dharma-card-inner p-3">
-                  <span className="text-[#ECE6D8]/30">Thumbnail Tactics:</span>{' '}
-                  <span className="text-[#ECE6D8]/70 font-medium">{result.meta_seo.thumbnail_tactics}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Strengths */}
-          {result.strengths?.length > 0 && (
-            <div className="dharma-card p-5">
-              <h3 className="text-green-400/80 font-bold text-sm mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-thumbs-up text-green-400/60"></i> Điểm Mạnh
-              </h3>
-              <div className="space-y-2">
-                {result.strengths.map((s: any, i: number) => (
-                  <div key={i} className="bg-green-500/[0.04] border border-green-500/10 rounded-xl p-3 text-xs">
-                    <span className="text-green-300/80 font-bold">{s.point}</span>
-                    <span className="dharma-tag bg-green-500/10 text-green-400/70 ml-2">{s.impact}</span>
-                    <p className="text-[#ECE6D8]/35 mt-1.5 leading-relaxed">{s.evidence}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Weaknesses */}
-          {result.weaknesses?.length > 0 && (
-            <div className="dharma-card p-5">
-              <h3 className="text-red-400/80 font-bold text-sm mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-thumbs-down text-red-400/60"></i> Điểm Yếu
-              </h3>
-              <div className="space-y-2">
-                {result.weaknesses.map((w: any, i: number) => (
-                  <div key={i} className="bg-red-500/[0.04] border border-red-500/10 rounded-xl p-3 text-xs">
-                    <span className="text-red-300/80 font-bold">{w.point}</span>
-                    <span className="dharma-tag bg-red-500/10 text-red-400/70 ml-2">{w.impact}</span>
-                    <p className="text-[#ECE6D8]/35 mt-1.5 leading-relaxed">
-                      <span className="text-[#D4A574]/60 font-semibold">Fix:</span> {w.fix}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Viral Suggestions */}
-          {result.viral_suggestions?.length > 0 && (
-            <div className="dharma-card p-5">
-              <h3 className="text-purple-400/80 font-bold text-sm mb-3 flex items-center gap-2">
-                <i className="fa-solid fa-fire text-purple-400/60"></i> Gợi Ý Viral
-              </h3>
-              <div className="space-y-2">
-                {result.viral_suggestions.map((v: any, i: number) => (
-                  <div key={i} className="bg-purple-500/[0.04] border border-purple-500/10 rounded-xl p-3 text-xs">
-                    <div className="text-purple-300/80 font-bold mb-1">{v.hook_title}</div>
-                    <p className="text-[#ECE6D8]/35 leading-relaxed">{v.outline_idea}</p>
-                    <p className="text-purple-400/40 mt-1.5 italic text-[11px]">{v.psychological_twist}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </motion.div>
+          {result.revenue_analysis && (<div className="bg-gradient-to-br from-green-900/10 to-emerald-900/10 border border-green-500/20 rounded-xl p-5"><h4 className="text-sm font-bold text-green-400 mb-4 uppercase">💰 REVENUE</h4><div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">{['estimated_cpm','estimated_rpm','total_estimated_earnings'].map(k=>(<div key={k} className="bg-black/30 p-3 rounded border border-green-500/10"><div className="text-[10px] text-green-300 mb-1">{k.replace(/_/g,' ')}</div><div className={`text-lg font-bold ${k.includes('earnings')?'text-green-400':'text-white'}`}>{result.revenue_analysis[k]||'N/A'}</div></div>))}</div><span className={`px-3 py-1 rounded-full text-xs font-bold border ${tierColor(result.revenue_analysis.monetization_tier)}`}>{result.revenue_analysis.monetization_tier}</span></div>)}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.isArray(result.strengths) && result.strengths.length > 0 && (<div className="bg-[#0f0f11] p-5 rounded-xl border border-yellow-500/20"><h4 className="text-sm font-bold text-yellow-400 mb-4">⚡ ĐIỂM MẠNH</h4><div className="space-y-3">{result.strengths.map((s:any,i:number)=>(<div key={i} className="bg-yellow-900/10 p-3 rounded border border-yellow-500/20"><div className="text-xs text-white font-medium mb-1">{s.point}</div><div className="text-[10px]"><span className="text-slate-500">Impact:</span> <span className={impactColor(s.impact)}>{s.impact}</span></div>{s.evidence&&<div className="text-[10px] text-slate-400 mt-1 italic">💡 {s.evidence}</div>}</div>))}</div></div>)}
+            {Array.isArray(result.weaknesses) && result.weaknesses.length > 0 && (<div className="bg-[#0f0f11] p-5 rounded-xl border border-red-500/20"><h4 className="text-sm font-bold text-red-400 mb-4">⚠️ ĐIỂM YẾU</h4><div className="space-y-3">{result.weaknesses.map((w:any,i:number)=>(<div key={i} className="bg-red-900/10 p-3 rounded border border-red-500/20"><div className="text-xs text-white font-medium mb-1">{w.point}</div><div className="text-[10px]"><span className="text-slate-500">Impact:</span> <span className={impactColor(w.impact)}>{w.impact}</span></div>{w.fix&&<div className="text-[10px] text-green-300 bg-green-900/10 p-2 rounded mt-2">✅ {w.fix}</div>}</div>))}</div></div>)}
+          </div>
+          {result.audio_strategy && (<div className="bg-gradient-to-br from-purple-900/10 to-pink-900/10 border border-purple-500/20 rounded-xl p-5"><h4 className="text-sm font-bold text-purple-400 mb-4 uppercase">🎵 AUDIO</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{['voice_analysis','music_style','hook_sounds'].map(k=>(<div key={k} className="bg-black/30 p-3 rounded border border-purple-500/10"><div className="text-[10px] text-purple-300 mb-1 font-bold">{k.replace(/_/g,' ')}</div><div className="text-xs text-slate-300">{result.audio_strategy[k]||'N/A'}</div></div>))}</div></div>)}
+          {result.engagement_signals && (<div className="bg-gradient-to-br from-cyan-900/10 to-blue-900/10 border border-cyan-500/20 rounded-xl p-5"><h4 className="text-sm font-bold text-cyan-400 mb-4 uppercase">📊 ENGAGEMENT</h4><div className="grid grid-cols-2 md:grid-cols-3 gap-3">{Object.entries(result.engagement_signals).map(([k,v])=>(<div key={k} className="bg-black/30 p-3 rounded border border-cyan-500/10 text-center"><div className="text-[10px] text-cyan-300 mb-1">{k.replace(/_/g,' ')}</div><div className="text-sm font-bold text-white">{String(v)}</div></div>))}</div></div>)}
+          {Array.isArray(result.viral_suggestions) && result.viral_suggestions.length > 0 && (<div className="bg-gradient-to-r from-yellow-900/5 to-amber-900/5 p-5 rounded-xl border border-yellow-500/20"><h3 className="text-sm font-bold text-yellow-400 mb-4 uppercase">GỢI Ý VIRAL</h3><div className="space-y-3">{result.viral_suggestions.map((idea:any,idx:number)=>(<div key={idx} className="bg-[#0f0f11]/80 p-4 rounded-lg border border-white/5 hover:border-yellow-500/30 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4"><div className="flex-1"><h4 className="text-sm font-bold text-white mb-1">{idea.hook_title}</h4><div className="text-xs text-slate-400">💡 {idea.outline_idea}</div></div><button onClick={()=>onUseStrategy?.(idea.hook_title)} className="shrink-0 bg-yellow-900/30 hover:bg-yellow-800/40 text-yellow-300 border border-yellow-500/30 px-4 py-2.5 rounded-lg font-bold text-xs flex items-center gap-2 transition-all hover:scale-105"><i className="fa-solid fa-bolt" /> KÍCH HOẠT</button></div>))}</div></div>)}
+        </div>
       )}
     </div>
   );

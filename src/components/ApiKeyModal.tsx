@@ -1,141 +1,86 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { XIcon, KeyIcon, CheckIcon, EyeIcon, EyeOffIcon } from './Icons';
-import { resetAiInstance, MODEL_LIST, getSelectedModel, setSelectedModel } from '../services/geminiService';
+import { loadApiConfig, saveApiConfig } from '../services/aiService';
 
-interface ApiKeyModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+interface Props { isOpen: boolean; onClose: () => void; }
 
-const STORAGE_KEY = 'tuai-dharma-api-key';
-
-const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
-  const [apiKey, setApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
-  const [selectedModelId, setSelectedModelId] = useState(getSelectedModel());
+const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
+  const [keys, setKeys] = useState<string[]>(['']);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) setApiKey(stored);
-    setSelectedModelId(getSelectedModel());
+    if (isOpen) {
+      const cfg = loadApiConfig();
+      setKeys(cfg.keyPool.length > 0 ? cfg.keyPool : ['']);
+    }
   }, [isOpen]);
 
-  const handleSave = () => {
-    const trimmed = apiKey.trim();
-    if (!trimmed) { setError('Vui lòng nhập API Key.'); return; }
-    if (!trimmed.startsWith('AIza')) { setError('API Key phải bắt đầu bằng "AIza..."'); return; }
-    localStorage.setItem(STORAGE_KEY, trimmed);
-    resetAiInstance();
-    setError('');
-    setSaved(true);
-    setTimeout(() => { setSaved(false); onClose(); }, 1000);
+  const updateKey = (i: number, v: string) => {
+    const k = [...keys]; k[i] = v; setKeys(k);
+    saveApiConfig({ keyPool: k });
   };
 
-  const handleModelSelect = (modelId: string) => {
-    setSelectedModelId(modelId);
-    setSelectedModel(modelId);
+  const addKey = () => setKeys([...keys, '']);
+  const removeKey = (i: number) => {
+    const k = keys.filter((_, x) => x !== i);
+    const next = k.length ? k : [''];
+    setKeys(next);
+    saveApiConfig({ keyPool: next });
   };
 
-  const hasKey = !!localStorage.getItem(STORAGE_KEY);
+  const validCount = keys.filter(k => k.trim().startsWith('AIza')).length;
+
+  if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && hasKey && onClose()}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="bg-[#0a0e1a]/95 backdrop-blur-2xl border border-white/[0.06] rounded-2xl w-full max-w-md overflow-hidden shadow-[0_25px_80px_rgba(0,0,0,0.6)]"
-          >
-            {/* Gold glow line */}
-            <div className="h-[1px] bg-gradient-to-r from-transparent via-[#D4A574]/40 to-transparent" />
+    <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-[#0f0f11] border border-yellow-900/30 w-full max-w-md rounded-2xl p-6 shadow-[0_0_60px_rgba(234,179,8,0.15)]">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="bg-yellow-900/30 p-2 rounded-lg border border-yellow-500/20">
+            <i className="fa-solid fa-key text-yellow-400"></i>
+          </div>
+          <div>
+            <h3 className="font-bold text-white text-lg">Gemini API Key</h3>
+            <p className="text-[11px] text-slate-500">Nhập key để sử dụng AI</p>
+          </div>
+        </div>
 
-            {/* Content */}
-            <div className="p-6 space-y-5">
-              {/* Title row */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4A574] to-[#C17D4A] flex items-center justify-center shadow-[0_0_20px_rgba(212,165,116,0.2)]">
-                    <KeyIcon className="text-[#0a0e1a] w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-[#ECE6D8] font-bold text-sm">Cài Đặt AI</h3>
-                    <p className="text-[#ECE6D8]/25 text-[10px]">Nhập key để sử dụng app</p>
-                  </div>
-                </div>
-                {hasKey && (
-                  <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center text-[#ECE6D8]/20 hover:text-[#ECE6D8]/50 hover:bg-white/[0.04] transition-all">
-                    <XIcon className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
+          className="block mb-4 text-center py-2 px-4 bg-yellow-900/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-400 font-bold hover:bg-yellow-900/20 transition-all">
+          🔑 Lấy API tại đây
+        </a>
 
-              {/* API Key Input */}
-              <div>
-                <div className="relative">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={apiKey}
-                    onChange={(e) => { setApiKey(e.target.value); setError(''); setSaved(false); }}
-                    placeholder="Dán API Key vào đây (AIzaSy...)"
-                    className="w-full !bg-white/[0.04] !border-white/[0.08] rounded-xl px-4 py-3.5 pr-12 text-[#ECE6D8] font-mono text-sm outline-none focus:!border-[#D4A574]/30"
-                  />
-                  <button onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ECE6D8]/20 hover:text-[#D4A574]/60 transition-colors">
-                    {showKey ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                  </button>
-                </div>
-                {error && <p className="text-red-400/80 text-xs mt-2 flex items-center gap-1"><i className="fa-solid fa-circle-exclamation"></i> {error}</p>}
-              </div>
-
-              {/* Link lấy API — đơn giản */}
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 text-sm text-[#D4A574]/70 font-bold hover:text-[#D4A574] transition-colors">
-                <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i> Lấy API tại đây
-              </a>
-
-              {/* Model Selection — compact */}
-              <div>
-                <label className="text-[10px] font-bold text-[#ECE6D8]/25 uppercase tracking-widest block mb-2">Chọn Model</label>
-                <div className="flex gap-1.5">
-                  {MODEL_LIST.map(model => {
-                    const isSelected = selectedModelId === model.id;
-                    return (
-                      <button key={model.id} onClick={() => handleModelSelect(model.id)}
-                        className={`flex-1 text-center py-2 px-2 rounded-lg text-[10px] font-bold transition-all duration-300 border ${
-                          isSelected
-                            ? 'bg-[#D4A574]/[0.08] border-[#D4A574]/20 text-[#D4A574]'
-                            : 'bg-white/[0.02] border-white/[0.04] text-[#ECE6D8]/30 hover:text-[#ECE6D8]/50'
-                        }`}>
-                        {model.name.replace('Gemini ', '')}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <button onClick={handleSave}
-                className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all duration-300 ${
-                  saved
-                    ? 'bg-green-500/20 text-green-300 border border-green-500/20'
-                    : 'dharma-btn-primary'
-                }`}>
-                {saved ? <span className="flex items-center justify-center gap-2"><CheckIcon className="w-4 h-4" /> Đã Lưu!</span> : 'Lưu & Sử Dụng'}
-              </button>
+        <div className="space-y-2 mb-4">
+          {keys.map((k, i) => (
+            <div key={i} className="flex gap-2">
+              <input type="password" value={k} onChange={e => updateKey(i, e.target.value)}
+                className="flex-1 bg-black border border-white/10 rounded-lg p-3 text-sm font-mono text-yellow-200 placeholder-white/20 outline-none focus:border-yellow-500/40"
+                placeholder="AIza..." />
+              {keys.length > 1 && (
+                <button onClick={() => removeKey(i)} className="text-red-500/50 hover:text-red-300 p-2"><i className="fa-solid fa-trash"></i></button>
+              )}
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          ))}
+        </div>
+
+        <button onClick={addKey} className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 mb-4 hover:underline">
+          <i className="fa-solid fa-plus"></i> Thêm Key (Gmail khác)
+        </button>
+
+        {validCount === 0 && (
+          <div className="text-[11px] text-yellow-500 bg-yellow-900/10 border border-yellow-500/20 rounded-lg p-2 mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-triangle-exclamation"></i>
+            Cần ít nhất 1 API Key bắt đầu bằng "AIza..."
+          </div>
+        )}
+
+        <button onClick={onClose} disabled={validCount === 0}
+          className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${validCount > 0 ? 'bg-yellow-900/40 text-yellow-100 border border-yellow-500/30 hover:bg-yellow-800/50' : 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed'}`}>
+          <i className="fa-solid fa-lock"></i> NHẬP API KEY ĐỂ TIẾP TỤC
+        </button>
+
+        <p className="text-[10px] text-slate-600 mt-3 text-center">🔒 Keys lưu an toàn trong trình duyệt</p>
+      </div>
+    </div>
   );
 };
 

@@ -1,71 +1,65 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
 
-export type ToastType = 'error' | 'success' | 'info';
-
-interface Toast {
+interface ToastMessage {
   id: number;
   message: string;
-  type: ToastType;
+  type: 'error' | 'success' | 'info';
 }
 
+let toastListeners: ((msg: ToastMessage) => void)[] = [];
 let toastId = 0;
-let addToastFn: ((message: string, type: ToastType) => void) | null = null;
 
-export const showToast = (message: string, type: ToastType = 'info') => {
-  addToastFn?.(message, type);
-};
+export function showToast(message: string, type: 'error' | 'success' | 'info' = 'error') {
+  toastId++;
+  toastListeners.forEach(fn => fn({ id: toastId, message, type }));
+}
 
 const ToastContainer: React.FC = () => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
-    addToastFn = (message: string, type: ToastType) => {
-      const id = ++toastId;
-      setToasts(prev => [...prev, { id, message, type }]);
+    const listener = (msg: ToastMessage) => {
+      setToasts(prev => [...prev, msg]);
       setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
+        setToasts(prev => prev.filter(t => t.id !== msg.id));
       }, 5000);
     };
-    return () => { addToastFn = null; };
+    toastListeners.push(listener);
+    return () => { toastListeners = toastListeners.filter(l => l !== listener); };
   }, []);
 
-  const dismiss = (id: number) => {
+  const dismiss = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
 
-  const getStyle = (type: ToastType) => {
-    if (type === 'error') return 'bg-red-500/[0.08] border-red-500/20 text-red-300';
-    if (type === 'success') return 'bg-green-500/[0.08] border-green-500/20 text-green-300';
-    return 'bg-[#D4A574]/[0.08] border-[#D4A574]/20 text-[#ECE6D8]/80';
-  };
-
-  const getIcon = (type: ToastType) => {
-    if (type === 'error') return 'fa-solid fa-circle-xmark text-red-400';
-    if (type === 'success') return 'fa-solid fa-circle-check text-green-400';
-    return 'fa-solid fa-circle-info text-[#D4A574]';
-  };
+  if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-20 right-4 md:right-6 z-[300] space-y-2 max-w-sm">
-      <AnimatePresence>
-        {toasts.map(toast => (
-          <motion.div key={toast.id}
-            initial={{ opacity: 0, x: 50, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 50, scale: 0.95 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className={`${getStyle(toast.type)} border rounded-xl p-3.5 shadow-[0_8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl flex items-start gap-2.5 cursor-pointer`}
-            onClick={() => dismiss(toast.id)}>
-            <i className={`${getIcon(toast.type)} text-sm mt-0.5 shrink-0`}></i>
-            <p className="text-xs font-medium leading-relaxed flex-1">{toast.message}</p>
-            <button onClick={(e) => { e.stopPropagation(); dismiss(toast.id); }}
-              className="text-current opacity-30 hover:opacity-70 transition-opacity duration-300 shrink-0">
-              <i className="fa-solid fa-xmark text-xs"></i>
-            </button>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+    <div className="fixed top-20 right-6 z-[60] space-y-2 max-w-sm">
+      {toasts.map(toast => {
+        const colorMap = {
+          error: 'bg-[#1a0505]/95 border-red-500/50 text-red-200',
+          success: 'bg-[#051a0a]/95 border-green-500/50 text-green-200',
+          info: 'bg-[#1a1508]/95 border-yellow-500/50 text-yellow-200',
+        };
+        const iconMap = {
+          error: 'fa-solid fa-triangle-exclamation text-red-500',
+          success: 'fa-solid fa-check-circle text-green-500',
+          info: 'fa-solid fa-info-circle text-yellow-500',
+        };
+        return (
+          <div key={toast.id}
+            className={`${colorMap[toast.type]} border p-4 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.3)] backdrop-blur-md animate-[slideIn_0.3s_ease-out]`}>
+            <div className="flex items-start gap-3">
+              <i className={`${iconMap[toast.type]} shrink-0 mt-0.5`}></i>
+              <div>
+                <p className="text-xs">{toast.message}</p>
+                <button onClick={() => dismiss(toast.id)} className="text-[10px] underline mt-1.5 hover:text-white opacity-60 hover:opacity-100">Đóng</button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
