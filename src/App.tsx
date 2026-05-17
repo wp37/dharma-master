@@ -39,18 +39,8 @@ const App: React.FC = () => {
     setActiveTab('script');
   };
 
-  const renderPage = () => {
-    switch (activeTab) {
-      case 'spy': return <SpyModule onUseStrategy={handleUseStrategy} />;
-      case 'script': return <ScriptModule onScriptGenerated={handleScriptGenerated} initialTopic={strategyTopic} />;
-      case 'studio': return <StudioModule segments={scriptSegments} />;
-      case 'seo': return <SeoModule initialTopic={strategyTopic} />;
-      default: return <SpyModule onUseStrategy={handleUseStrategy} />;
-    }
-  };
-
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative z-10">
       <Header
         uiLang={uiLang}
         onToggleLang={() => setUiLang(p => p === 'vi' ? 'en' : 'vi')}
@@ -64,12 +54,23 @@ const App: React.FC = () => {
           onTabChange={setActiveTab}
           hasScriptData={scriptSegments.length > 0}
         />
-        <div className="flex-1 bg-[#0a0a0a]/60 rounded-2xl border border-white/5 p-4 md:p-6 md:overflow-y-auto relative min-h-[500px] backdrop-blur-md shadow-[inset_0_0_50px_-20px_rgba(234,179,8,0.05)]">
-          {renderPage()}
+        <div className="flex-1 bg-[#0a0e1a]/60 rounded-2xl border border-teal-900/10 p-4 md:p-6 md:overflow-y-auto relative min-h-[500px] backdrop-blur-md shadow-[inset_0_0_60px_-20px_rgba(13,148,136,0.04)]">
+          <div style={{ display: activeTab === 'spy' ? 'block' : 'none' }}>
+            <SpyModule onUseStrategy={handleUseStrategy} />
+          </div>
+          <div style={{ display: activeTab === 'script' ? 'block' : 'none' }}>
+            <ScriptModule onScriptGenerated={handleScriptGenerated} initialTopic={strategyTopic} />
+          </div>
+          <div style={{ display: activeTab === 'studio' ? 'block' : 'none' }}>
+            <StudioModule segments={scriptSegments} />
+          </div>
+          <div style={{ display: activeTab === 'seo' ? 'block' : 'none' }}>
+            <SeoModule initialTopic={strategyTopic} />
+          </div>
         </div>
       </main>
 
-      <footer className="relative border-t border-yellow-900/20 py-6 bg-[#0a0805]">
+      <footer className="relative border-t border-teal-900/20 py-6 bg-[#060810] flame-border">
         <div className="relative max-w-6xl mx-auto px-4 text-center z-10">
           <div className="text-slate-500 text-xs font-light tracking-wide">
             TUAI DHARMA MASTER © {new Date().getFullYear()} | Hỗ trợ: 0814666040 | zalo.me/0814666040

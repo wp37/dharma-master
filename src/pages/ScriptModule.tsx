@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { callAI } from '../services/aiService';
-import { SYSTEM_PROMPT_SCRIPT_WRITER } from '../data/prompts';
-import { BUDDHISM_CONTEXTS, VISUAL_STYLES, SECONDS_PER_SCENE } from '../data/constants';
+import { SYSTEM_PROMPT_SCRIPT_WRITER, STYLE_RECOMMENDATION_PROMPT } from '../data/prompts';
+import { BUDDHISM_CONTEXTS, VISUAL_STYLES, SECONDS_PER_SCENE, MODE_OPTIONS } from '../data/constants';
 import { showToast } from '../components/Toast';
 
 interface Props { onScriptGenerated: (segments: any[], style: string) => void; initialTopic?: string; }
@@ -11,15 +11,35 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
   const [duration, setDuration] = useState(1);
   const [market, setMarket] = useState('vn_mahayana');
   const [style, setStyle] = useState('auto');
+  const [selectedMode, setSelectedMode] = useState('quick');
   const [loading, setLoading] = useState(false);
   const [segments, setSegments] = useState<any[]>([]);
+  const [styleRec, setStyleRec] = useState<any>(null);
+  const [isRecommending, setIsRecommending] = useState(false);
 
   React.useEffect(() => { if (initialTopic) setTopic(initialTopic); }, [initialTopic]);
 
+  // Sync duration with mode selection
+  const activeMode = MODE_OPTIONS.find(m => m.id === selectedMode) || MODE_OPTIONS[0];
   const scenes = Math.ceil((Math.max(0.1, duration) * 60) / SECONDS_PER_SCENE);
-  const mode = duration < 3 ? { name: '🟢 DAILY DHARMA (<3m)', wpm: 130 } : duration <= 10 ? { name: '🔵 SUTRA STUDY (3-10m)', wpm: 140 } : { name: '🟣 EPIC JOURNEY (>10m)', wpm: 120 };
-  const words = Math.floor(duration * mode.wpm);
-  const modeColor = duration < 3 ? 'text-green-400 border-green-500/50 bg-green-900/10' : duration <= 10 ? 'text-blue-400 border-blue-500/50 bg-blue-900/10' : 'text-purple-400 border-purple-500/50 bg-purple-900/10';
+  const words = Math.floor(duration * activeMode.wpm);
+  const modeColor = selectedMode === 'quick' ? 'teal' : selectedMode === 'story' ? 'cyan' : 'violet';
+
+  // AI Style Recommendation
+  const handleStyleRecommend = async () => {
+    if (!topic) return showToast('Nhập chủ đề trước khi đề xuất style!');
+    setIsRecommending(true);
+    try {
+      const prompt = `CHỦ ĐỀ: "${topic}"\nTHỜI LƯỢNG: ${duration} phút\nCHẾ ĐỘ: ${activeMode.name}\nĐỀ XUẤT PHONG CÁCH PHÙ HỢP.`;
+      const rec = await callAI(prompt, STYLE_RECOMMENDATION_PROMPT);
+      setStyleRec(rec);
+      if (rec.primary_style) {
+        setStyle(rec.primary_style);
+        showToast(`✨ AI đề xuất: ${VISUAL_STYLES.find(s => s.id === rec.primary_style)?.name || rec.primary_style}`, 'success');
+      }
+    } catch (e: any) { showToast(e.message); }
+    finally { setIsRecommending(false); }
+  };
 
   const handleGenerate = async () => {
     if (!topic) return showToast('Nhập chủ đề Phật pháp!');
@@ -42,6 +62,13 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
       }
       setSegments(segs);
       onScriptGenerated(segs, json.suggested_style || '');
+
+      // localStorage sharing — Studio & SEO tabs can read this
+      try {
+        localStorage.setItem('dharma_last_script', JSON.stringify(segs));
+        localStorage.setItem('dharma_last_topic', topic);
+        localStorage.setItem('dharma_last_style', style);
+      } catch { /* quota exceeded — ignore */ }
     } catch (e: any) { showToast(e.message); }
     finally { setLoading(false); }
   };
@@ -56,41 +83,106 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-[slideIn_0.4s_ease-out]">
-      <div className="bg-[#0f0f11] border border-white/10 p-6 rounded-2xl shadow-lg">
-        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><i className="fa-solid fa-pen-nib text-yellow-500" /> Soạn Kịch Bản Pháp Thoại</h2>
+      <div className="cosmic-card p-6 rounded-2xl">
+        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><i className="fa-solid fa-pen-nib text-amber-400" /> Soạn Kịch Bản Pháp Thoại</h2>
         <div className="space-y-4">
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Chủ Đề Phật Pháp</label>
-            <input value={topic} onChange={e => setTopic(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-yellow-500/50 placeholder-white/20" placeholder="VD: Tứ Diệu Đế, Thiền Vipassana, Từ Bi Quán..." />
+            <input value={topic} onChange={e => setTopic(e.target.value)} className="w-full bg-[#060810] border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-teal-500/50 placeholder-white/20 transition-colors" placeholder="VD: Tứ Diệu Đế, Thiền Vipassana, Từ Bi Quán..." />
           </div>
+
+          {/* === MODE SELECTION GRID === */}
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2"><i className="fa-solid fa-sliders text-teal-400" /> CHẾ ĐỘ VIDEO</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {MODE_OPTIONS.map(mode => (
+                <button key={mode.id} onClick={() => {
+                  setSelectedMode(mode.id);
+                  if (mode.id === 'quick') setDuration(1);
+                  else if (mode.id === 'story') setDuration(2);
+                  else setDuration(5);
+                }}
+                  className={`p-4 rounded-xl border text-left transition-all group ${
+                    selectedMode === mode.id
+                      ? `bg-${mode.color}-900/20 border-${mode.color}-500/50 text-${mode.color}-300 shadow-[0_0_15px_rgba(13,148,136,0.1)]`
+                      : 'bg-[#0a0e1a] border-white/5 text-slate-400 hover:bg-[#111827] hover:text-white hover:border-white/10'
+                  }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">{mode.icon}</span>
+                    <span className="font-bold text-sm">{mode.name}</span>
+                  </div>
+                  <div className="text-[10px] opacity-70">{mode.desc}</div>
+                  <div className="text-[10px] opacity-50 mt-1">~{mode.scenes} cảnh</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#151515] border border-white/5 rounded-xl p-4 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/50" />
-              <label className="text-xs font-bold text-slate-400 uppercase mb-3 block flex items-center gap-2"><i className="fa-solid fa-clock text-blue-400" /> THỜI LƯỢNG (PHÚT)</label>
+            <div className="bg-[#0a0e1a] border border-white/5 rounded-xl p-4 relative overflow-hidden">
+              <div className={`absolute top-0 left-0 w-1 h-full bg-${modeColor}-500/50`} />
+              <label className="text-xs font-bold text-slate-400 uppercase mb-3 block flex items-center gap-2"><i className="fa-solid fa-clock text-teal-400" /> THỜI LƯỢNG (PHÚT)</label>
               <div className="flex items-center gap-5">
-                <input type="number" value={duration} step={0.5} onChange={e => setDuration(parseFloat(e.target.value) || 1)} className="w-20 bg-black border border-white/10 rounded-lg p-3 text-2xl font-black text-white text-center outline-none" />
+                <input type="number" value={duration} step={0.5} onChange={e => setDuration(parseFloat(e.target.value) || 1)} className="w-20 bg-[#060810] border border-white/10 rounded-lg p-3 text-2xl font-black text-white text-center outline-none" />
                 <div className="flex flex-col gap-1.5 text-xs">
-                  <div><span className="text-slate-500">Số cảnh:</span> <span className="font-bold text-green-400 text-base">~{scenes}</span></div>
-                  <div><span className="text-slate-500">Voice:</span> <span className="font-bold text-purple-400 text-base">~{words} từ</span></div>
+                  <div><span className="text-slate-500">Số cảnh:</span> <span className="font-bold text-teal-400 text-base">~{scenes}</span></div>
+                  <div><span className="text-slate-500">Lời thoại:</span> <span className="font-bold text-violet-400 text-base">~{words} từ</span></div>
                 </div>
               </div>
             </div>
-            <div className="bg-[#151515] border border-white/5 rounded-xl p-4">
-              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2"><i className="fa-solid fa-globe text-orange-400" /> TRUYỀN THỐNG</label>
-              <select value={market} onChange={e => setMarket(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm text-white outline-none cursor-pointer">
+            <div className="bg-[#0a0e1a] border border-white/5 rounded-xl p-4">
+              <label className="text-xs font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2"><i className="fa-solid fa-globe text-orange-400" /> TRUYỀN THỐNG PHẬT GIÁO</label>
+              <select value={market} onChange={e => setMarket(e.target.value)} className="w-full bg-[#060810] border border-white/10 rounded-lg p-3 text-sm text-white outline-none cursor-pointer">
                 {markets.map(m => <option key={m.id} value={m.id}>{m.flag} {m.name}</option>)}
               </select>
             </div>
           </div>
-          <div className={`border rounded-xl p-4 transition-all ${modeColor}`}>
-            <div className="font-bold">{mode.name}</div>
-          </div>
-          <div className="bg-[#151515] border border-white/5 rounded-xl p-4">
-            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2"><i className="fa-solid fa-palette text-pink-400" /> PHONG CÁCH VISUAL</label>
+
+          {/* === VISUAL STYLE + AI RECOMMEND === */}
+          <div className="bg-[#0a0e1a] border border-white/5 rounded-xl p-4">
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><i className="fa-solid fa-palette text-violet-400" /> PHONG CÁCH VISUAL</label>
+              <button onClick={handleStyleRecommend} disabled={isRecommending}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 bg-gradient-to-r from-amber-900/30 to-teal-900/30 text-amber-300 border border-amber-500/20 hover:border-amber-500/40 transition-all disabled:opacity-50 hover:shadow-[0_0_15px_rgba(212,165,116,0.15)]">
+                {isRecommending ? <><i className="fa-solid fa-sync animate-spin" /> Đang phân tích...</> : <><i className="fa-solid fa-wand-magic-sparkles" /> 🪄 AI Đề Xuất Style</>}
+              </button>
+            </div>
+
+            {/* AI Recommendation Result */}
+            {styleRec && (
+              <div className="mb-3 p-3 rounded-lg bg-gradient-to-r from-amber-900/10 to-teal-900/10 border border-amber-500/15 animate-[slideIn_0.3s_ease-out]">
+                <div className="flex items-start gap-2 mb-2">
+                  <i className="fa-solid fa-lightbulb text-amber-400 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="text-[11px] font-bold text-amber-300 mb-0.5">AI ĐỀ XUẤT: {VISUAL_STYLES.find(s => s.id === styleRec.primary_style)?.name || styleRec.primary_style}</div>
+                    <div className="text-[10px] text-slate-400">{styleRec.primary_reason}</div>
+                  </div>
+                </div>
+                {styleRec.alternative_style && (
+                  <div className="flex items-start gap-2 pt-2 border-t border-white/5">
+                    <i className="fa-solid fa-shuffle text-teal-400 mt-0.5 text-[10px]" />
+                    <div className="flex-1">
+                      <div className="text-[10px] text-teal-300">Thay thế: {VISUAL_STYLES.find(s => s.id === styleRec.alternative_style)?.name || styleRec.alternative_style}</div>
+                      <div className="text-[9px] text-slate-500">{styleRec.alternative_reason}</div>
+                    </div>
+                    <button onClick={() => { setStyle(styleRec.alternative_style); showToast('✅ Đã đổi style!', 'success'); }}
+                      className="text-[9px] px-2 py-1 rounded bg-teal-900/30 text-teal-300 border border-teal-500/20 hover:bg-teal-900/50 shrink-0">Dùng style này</button>
+                  </div>
+                )}
+                {Array.isArray(styleRec.mood_keywords) && styleRec.mood_keywords.length > 0 && (
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {styleRec.mood_keywords.map((kw: string, i: number) => (
+                      <span key={i} className="bg-[#060810] text-[9px] text-slate-400 px-2 py-0.5 rounded-full border border-white/5">{kw}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {VISUAL_STYLES.map(s => (
                 <button key={s.id} onClick={() => setStyle(s.id)}
-                  className={`text-[10px] p-2 rounded border text-left transition-all ${style === s.id ? 'bg-yellow-900/30 border-yellow-500/50 text-white shadow-[0_0_10px_rgba(234,179,8,0.2)]' : 'bg-[#1a1a1a] border-white/5 text-slate-400 hover:bg-[#252525]'}`}>
+                  className={`text-[10px] p-2 rounded border text-left transition-all ${style === s.id ? 'bg-teal-900/30 border-teal-500/50 text-white shadow-[0_0_10px_rgba(13,148,136,0.2)]' : 'bg-[#0f1424] border-white/5 text-slate-400 hover:bg-[#111827] hover:text-white'}`}>
                   <div className="font-bold mb-0.5">{s.name}</div>
                   <div className="text-[9px] opacity-70 truncate">{s.desc}</div>
                 </button>
@@ -98,7 +190,7 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
             </div>
           </div>
           <button onClick={handleGenerate} disabled={loading}
-            className="w-full py-4 bg-yellow-900/50 hover:bg-yellow-800/50 border border-yellow-500/30 text-yellow-100 font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+            className="w-full py-4 btn-sacred font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <><i className="fa-solid fa-sync animate-spin" /> ĐANG VIẾT...</> : <><i className="fa-solid fa-om" /> VIẾT KỊCH BẢN PHÁP THOẠI</>}
           </button>
         </div>
@@ -107,25 +199,25 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
         <div className="space-y-4 pb-10">
           <div className="flex justify-between items-center px-2">
             <div className="text-xs text-slate-500 font-bold">Đã tạo: {segments.length} phân đoạn</div>
-            <button onClick={copyAll} className="text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 bg-white text-black hover:bg-slate-200"><i className="fa-solid fa-copy" /> Copy Voice Toàn Bộ</button>
+            <button onClick={copyAll} className="text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 bg-white text-black hover:bg-slate-200"><i className="fa-solid fa-copy" /> Copy Lời Thoại</button>
           </div>
           {segments.map((seg, idx) => (
-            <div key={idx} className="bg-[#0f0f11] border border-white/10 p-4 rounded-xl flex flex-col sm:flex-row gap-4 hover:border-yellow-500/30 transition-colors relative">
+            <div key={idx} className="cosmic-card p-4 rounded-xl flex flex-col sm:flex-row gap-4 hover:!border-teal-500/20 transition-colors relative">
               <div className="w-full sm:w-24 shrink-0 text-center pt-1 border-r border-white/5 pr-2">
-                <div className="text-[10px] bg-[#1a1a1a] px-2 py-1 rounded font-bold text-white mb-1">SCENE {seg.scene_number || idx + 1}</div>
+                <div className="text-[10px] bg-[#0a0e1a] px-2 py-1 rounded font-bold text-white mb-1">CẢNH {seg.scene_number || idx + 1}</div>
                 <div className="text-[9px] text-slate-500 font-mono mb-1">{seg.time}</div>
-                <div className="text-[9px] text-yellow-400 font-bold uppercase break-words">{seg.section}</div>
+                <div className="text-[9px] text-amber-400 font-bold uppercase break-words">{seg.section}</div>
               </div>
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-[#151515]/50 p-3 rounded border border-white/5">
-                  <div className="text-[10px] text-blue-400 font-bold flex items-center gap-1 mb-1"><i className="fa-solid fa-eye" /> VISUAL</div>
+                <div className="bg-[#0a0e1a]/50 p-3 rounded border border-white/5">
+                  <div className="text-[10px] text-cyan-400 font-bold flex items-center gap-1 mb-1"><i className="fa-solid fa-eye" /> HÌNH ẢNH</div>
                   <p className="text-xs text-slate-300 mb-2">{seg.visual_desc_vi || seg.visual_desc || ''}</p>
-                  {seg.strategy_note && <div className="mt-2 p-2 rounded bg-yellow-900/10 border border-yellow-500/20 text-[10px] text-yellow-200/80 italic">💡 {seg.strategy_note}</div>}
+                  {seg.strategy_note && <div className="mt-2 p-2 rounded bg-amber-900/10 border border-amber-500/20 text-[10px] text-amber-200/80 italic">💡 {seg.strategy_note}</div>}
                 </div>
-                <div className="bg-[#151515]/50 p-3 rounded border border-white/5">
+                <div className="bg-[#0a0e1a]/50 p-3 rounded border border-white/5">
                   <div className="flex justify-between items-center mb-1">
-                    <div className="text-[10px] text-purple-400 font-bold flex items-center gap-1"><i className="fa-solid fa-microphone-alt" /> VOICE</div>
-                    <button onClick={() => { navigator.clipboard.writeText(seg.voice_text || ''); showToast('✅ Copied!', 'success'); }} className="text-slate-500 hover:text-white"><i className="fa-regular fa-copy" /></button>
+                    <div className="text-[10px] text-violet-400 font-bold flex items-center gap-1"><i className="fa-solid fa-microphone-alt" /> LỜI THOẠI</div>
+                    <button onClick={() => { navigator.clipboard.writeText(seg.voice_text || ''); showToast('✅ Đã copy!', 'success'); }} className="text-slate-500 hover:text-white"><i className="fa-regular fa-copy" /></button>
                   </div>
                   <p className="text-sm text-indigo-100 font-medium italic leading-relaxed text-justify">"{seg.chapter_voice_block || seg.voice_text || '(Đọc tiếp...)'}"</p>
                 </div>

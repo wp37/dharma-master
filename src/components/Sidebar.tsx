@@ -1,5 +1,5 @@
 import React from 'react';
-import { TAB_COLORS, type TabId } from '../data/constants';
+import { TAB_COLORS, TAB_NAMES, type TabId } from '../data/constants';
 
 interface SidebarProps {
   activeTab: TabId;
@@ -7,37 +7,33 @@ interface SidebarProps {
   hasScriptData: boolean;
 }
 
-const TABS: { id: TabId; icon: string; title: string; subtitle: string }[] = [
-  { id: 'spy', icon: 'fa-brands fa-youtube', title: '1. DHARMA SPY', subtitle: 'Phân tích Video Phật Pháp' },
-  { id: 'script', icon: 'fa-solid fa-dharmachakra', title: '2. PHÁP THOẠI', subtitle: 'Viết Kịch Bản Giảng Pháp' },
-  { id: 'studio', icon: 'fa-solid fa-place-of-worship', title: '3. STUDIO', subtitle: 'Prompt Video & Ảnh' },
-  { id: 'seo', icon: 'fa-solid fa-magnifying-glass-chart', title: '4. SEO MASTER', subtitle: 'Tối Ưu Nội Dung' },
-];
+const TAB_IDS: TabId[] = ['spy', 'script', 'studio', 'seo'];
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, hasScriptData }) => {
   return (
     <div className="w-full md:w-64 flex md:flex-col gap-2 shrink-0 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-      {TABS.map(tab => {
-        const isActive = activeTab === tab.id;
-        const isStudioDisabled = tab.id === 'studio' && !hasScriptData && !isActive;
-        const colors = TAB_COLORS[tab.id];
+      {TAB_IDS.map(tabId => {
+        const isActive = activeTab === tabId;
+        const isStudioDisabled = tabId === 'studio' && !hasScriptData && !isActive;
+        const colors = TAB_COLORS[tabId];
+        const info = TAB_NAMES[tabId];
 
         return (
           <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
+            key={tabId}
+            onClick={() => onTabChange(tabId)}
             disabled={isStudioDisabled}
-            className={`p-4 rounded-xl text-left border transition-all shrink-0 min-w-[200px] md:min-w-0 ${
+            className={`sidebar-item p-4 rounded-xl text-left border transition-all shrink-0 min-w-[200px] md:min-w-0 ${
               isActive
-                ? `${colors.bg} ${colors.border} ${colors.text} ${colors.shadow}`
-                : `bg-transparent border-transparent text-yellow-500/50 hover:bg-[#1a1508] hover:text-yellow-200 ${isStudioDisabled ? 'opacity-30 cursor-not-allowed' : ''}`
+                ? `active ${colors.bg} ${colors.border} ${colors.text} ${colors.shadow} backdrop-blur-sm`
+                : `bg-transparent border-transparent text-slate-500 hover:bg-[#0a0e1a] hover:text-teal-200/80 hover:border-teal-900/20 ${isStudioDisabled ? 'opacity-30 cursor-not-allowed' : ''}`
             }`}
           >
             <div className="flex items-center gap-3 mb-1">
-              <i className={`${tab.icon} text-lg`}></i>
-              <span className="font-bold text-sm">{tab.title}</span>
+              <i className={`${info.icon} text-lg`}></i>
+              <span className="font-bold text-sm">{info.name}</span>
             </div>
-            <p className="text-[10px] opacity-60">{tab.subtitle}</p>
+            <p className="text-[10px] opacity-60">{info.desc}</p>
           </button>
         );
       })}

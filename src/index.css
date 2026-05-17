@@ -1,32 +1,42 @@
 /* =====================================================
    TUAI DHARMA MASTER — Design System
-   Dark & Gold Sacred Theme
+   Cosmic Sacred Buddhist Theme
+   Inspired by Mahasthamaprapta Mantra Visual
    ===================================================== */
 
-/* Custom Scrollbar */
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&family=Cinzel:wght@400;500;600;700;800;900&display=swap');
+
+/* ===== Custom Scrollbar ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0a0805; }
-::-webkit-scrollbar-thumb { background: #4e421b; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #7a662d; }
+::-webkit-scrollbar-track { background: #060810; }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #0d9488, #1e1b4b); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #14b8a6, #312e81); }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ===== Body — Cosmic Background ===== */
 body {
-  background-color: #0a0805;
-  color: #e0e7ff;
-  background-image: radial-gradient(ellipse at top, rgba(202, 138, 4, 0.12), #0a0805 60%, #0a0805);
-  font-family: 'Inter', sans-serif;
+  background-color: #060810;
+  color: #ece6d8;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(13, 148, 136, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+    radial-gradient(ellipse at 20% 80%, rgba(232, 93, 38, 0.04) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 100%, rgba(30, 27, 75, 0.3) 0%, #060810 60%);
+  font-family: 'Be Vietnam Pro', 'Inter', sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
 }
 
-/* Selection */
+/* ===== Selection ===== */
 ::selection {
-  background: rgba(234, 179, 8, 0.3);
+  background: rgba(13, 148, 136, 0.3);
+  color: #f0fdfa;
 }
 
-/* Spinner */
+/* ===== Spinner ===== */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -34,17 +44,174 @@ body {
   animation: spin 1s linear infinite;
 }
 
-/* Slide In */
+/* ===== Slide In ===== */
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
-/* Pulse glow for dharma icon */
+/* ===== Sacred Glow Pulse — Teal ===== */
+@keyframes sacredGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(13, 148, 136, 0.4)); }
+  50% { filter: drop-shadow(0 0 10px rgba(13, 148, 136, 0.8)); }
+}
+.sacred-glow {
+  animation: sacredGlow 2.5s ease-in-out infinite;
+}
+
+/* ===== Legacy pulse-glow mapped to sacred ===== */
 @keyframes pulseGlow {
-  0%, 100% { filter: drop-shadow(0 0 3px rgba(234,179,8,0.4)); }
-  50% { filter: drop-shadow(0 0 8px rgba(234,179,8,0.8)); }
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(13, 148, 136, 0.4)); }
+  50% { filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.8)); }
 }
 .pulse-glow {
   animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ===== Mandala Spin ===== */
+@keyframes mandalaSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.mandala-spin {
+  animation: mandalaSpin 12s linear infinite;
+}
+
+/* ===== Cosmic Float ===== */
+@keyframes cosmicFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.cosmic-float {
+  animation: cosmicFloat 5s ease-in-out infinite;
+}
+
+/* ===== Flame Flicker — Bottom border glow ===== */
+@keyframes flameFlicker {
+  0%, 100% { opacity: 0.6; }
+  25% { opacity: 0.9; }
+  50% { opacity: 0.5; }
+  75% { opacity: 1; }
+}
+.flame-border {
+  position: relative;
+}
+.flame-border::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e85d26, #ff6b35, #eab308, #e85d26, transparent);
+  animation: flameFlicker 3s ease-in-out infinite;
+}
+
+/* ===== Sacred Glass Effect ===== */
+.sacred-glass {
+  background: rgba(10, 14, 26, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(13, 148, 136, 0.15);
+  box-shadow: 
+    inset 0 0 30px -10px rgba(13, 148, 136, 0.05),
+    0 0 20px -5px rgba(13, 148, 136, 0.08);
+}
+
+/* ===== Cosmic Card ===== */
+.cosmic-card {
+  background: linear-gradient(135deg, rgba(15, 20, 36, 0.9), rgba(10, 14, 26, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.cosmic-card:hover {
+  border-color: rgba(13, 148, 136, 0.2);
+  box-shadow: 0 4px 30px rgba(13, 148, 136, 0.08);
+}
+
+/* ===== Particle Background (via pseudo-element) ===== */
+.cosmic-particles::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(13, 148, 136, 0.3), transparent),
+    radial-gradient(1px 1px at 40% 70%, rgba(99, 102, 241, 0.2), transparent),
+    radial-gradient(1px 1px at 60% 10%, rgba(212, 165, 116, 0.25), transparent),
+    radial-gradient(1px 1px at 80% 50%, rgba(13, 148, 136, 0.2), transparent),
+    radial-gradient(1px 1px at 10% 90%, rgba(232, 93, 38, 0.15), transparent),
+    radial-gradient(1px 1px at 70% 85%, rgba(99, 102, 241, 0.15), transparent),
+    radial-gradient(1px 1px at 50% 50%, rgba(13, 148, 136, 0.2), transparent),
+    radial-gradient(1px 1px at 30% 15%, rgba(212, 165, 116, 0.15), transparent);
+}
+
+/* ===== Teal Glow Button ===== */
+.btn-sacred {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.25), rgba(15, 23, 42, 0.8));
+  border: 1px solid rgba(13, 148, 136, 0.3);
+  color: #ccfbf1;
+  transition: all 0.3s ease;
+}
+.btn-sacred:hover {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.35), rgba(15, 23, 42, 0.9));
+  box-shadow: 0 0 20px rgba(13, 148, 136, 0.2);
+  border-color: rgba(13, 148, 136, 0.5);
+}
+
+/* ===== Fade In ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn .3s ease-out; }
+
+/* ===== Slide Up ===== */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slideUp .35s ease-out; }
+
+/* ===== Sidebar Item — Active Indicator ===== */
+.sidebar-item {
+  transition: all 0.2s ease;
+  position: relative;
+}
+.sidebar-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #0d9488, #14b8a6);
+  transition: height 0.2s ease;
+}
+.sidebar-item.active::before {
+  height: 60%;
+}
+
+/* ===== Mode Card Glow ===== */
+@keyframes modeGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(13, 148, 136, 0.1); }
+  50% { box-shadow: 0 0 20px rgba(13, 148, 136, 0.2); }
+}
+
+/* ===== Style Rec Shimmer ===== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.style-rec-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(212, 165, 116, 0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
 }

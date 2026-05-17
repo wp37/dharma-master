@@ -33,10 +33,10 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-[#0f0f11] border border-yellow-900/30 w-full max-w-md rounded-2xl p-6 shadow-[0_0_60px_rgba(234,179,8,0.15)]">
+      <div className="bg-[#0f1424] border border-teal-900/30 w-full max-w-md rounded-2xl p-6 shadow-[0_0_60px_rgba(13,148,136,0.15)]">
         <div className="flex items-center gap-3 mb-4">
-          <div className="bg-yellow-900/30 p-2 rounded-lg border border-yellow-500/20">
-            <i className="fa-solid fa-key text-yellow-400"></i>
+          <div className="bg-teal-900/30 p-2 rounded-lg border border-teal-500/20">
+            <i className="fa-solid fa-key text-teal-400"></i>
           </div>
           <div>
             <h3 className="font-bold text-white text-lg">Gemini API Key</h3>
@@ -45,7 +45,7 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
-          className="block mb-4 text-center py-2 px-4 bg-yellow-900/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-400 font-bold hover:bg-yellow-900/20 transition-all">
+          className="block mb-4 text-center py-2 px-4 bg-teal-900/10 border border-teal-500/20 rounded-lg text-xs text-teal-400 font-bold hover:bg-teal-900/20 transition-all">
           🔑 Lấy API tại đây
         </a>
 
@@ -53,7 +53,7 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
           {keys.map((k, i) => (
             <div key={i} className="flex gap-2">
               <input type="password" value={k} onChange={e => updateKey(i, e.target.value)}
-                className="flex-1 bg-black border border-white/10 rounded-lg p-3 text-sm font-mono text-yellow-200 placeholder-white/20 outline-none focus:border-yellow-500/40"
+                className="flex-1 bg-[#060810] border border-white/10 rounded-lg p-3 text-sm font-mono text-teal-200 placeholder-white/20 outline-none focus:border-teal-500/40"
                 placeholder="AIza..." />
               {keys.length > 1 && (
                 <button onClick={() => removeKey(i)} className="text-red-500/50 hover:text-red-300 p-2"><i className="fa-solid fa-trash"></i></button>
@@ -62,19 +62,19 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
           ))}
         </div>
 
-        <button onClick={addKey} className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1 mb-4 hover:underline">
+        <button onClick={addKey} className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1 mb-4 hover:underline">
           <i className="fa-solid fa-plus"></i> Thêm Key (Gmail khác)
         </button>
 
         {validCount === 0 && (
-          <div className="text-[11px] text-yellow-500 bg-yellow-900/10 border border-yellow-500/20 rounded-lg p-2 mb-4 flex items-center gap-2">
+          <div className="text-[11px] text-amber-400 bg-amber-900/10 border border-amber-500/20 rounded-lg p-2 mb-4 flex items-center gap-2">
             <i className="fa-solid fa-triangle-exclamation"></i>
             Cần ít nhất 1 API Key bắt đầu bằng "AIza..."
           </div>
         )}
 
         <button onClick={onClose} disabled={validCount === 0}
-          className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${validCount > 0 ? 'bg-yellow-900/40 text-yellow-100 border border-yellow-500/30 hover:bg-yellow-800/50' : 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed'}`}>
+          className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${validCount > 0 ? 'btn-sacred' : 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed'}`}>
           <i className="fa-solid fa-lock"></i> NHẬP API KEY ĐỂ TIẾP TỤC
         </button>
 

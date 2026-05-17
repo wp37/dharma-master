@@ -29,64 +29,84 @@ export interface BuddhismContext {
 
 export const BUDDHISM_CONTEXTS: Record<string, BuddhismContext> = {
   vn_mahayana: {
-    id: 'vn_mahayana', name: 'Vietnam (Mahayana - Thiền Tông)', flag: '🇻🇳',
+    id: 'vn_mahayana', name: 'Việt Nam — Đại Thừa (Thiền Tông)', flag: '🇻🇳',
     voice_lang: 'Vietnamese', currency: 'VND',
     culture: 'Thiền Buddhism fusion with local traditions, ancestor veneration, Quan Âm devotion, pagoda culture, vegetarianism, mindfulness in daily life, compassionate living.',
-    tradition: 'Mahayana (Đại Thừa)',
-    key_practices: 'Thiền meditation, chanting, vegetarian diet, ancestor worship.',
-    philosophy: 'Bodhisattva path, compassion, filial piety.',
+    tradition: 'Đại Thừa (Mahayana)',
+    key_practices: 'Thiền định, tụng kinh, ăn chay, thờ cúng tổ tiên.',
+    philosophy: 'Con đường Bồ Tát, từ bi, hiếu đạo.',
     writing_style: 'Warm, poetic, respectful, storytelling.',
-    human_element: 'Stories of village pagoda life, grandmother\'s wisdom.'
+    human_element: 'Câu chuyện chùa làng, trí tuệ bà ngoại.'
+  },
+  vn_phatgiao: {
+    id: 'vn_phatgiao', name: 'Việt Nam — Phật Học Ứng Dụng', flag: '🇻🇳',
+    voice_lang: 'Vietnamese', currency: 'VND',
+    culture: 'Phật học ứng dụng đời sống, tâm lý học Phật giáo, thiền trong công việc, chư Phật và Bồ Tát, giáo lý Nhân Quả, Nghiệp Báo.',
+    tradition: 'Phật Học Ứng Dụng (Applied Buddhism)',
+    key_practices: 'Thiền chánh niệm, Niệm Phật, tu tập hàng ngày, sám hối.',
+    philosophy: 'Tứ Diệu Đế, Bát Chánh Đạo, Nhân Quả, Nghiệp Báo, Vô Thường.',
+    writing_style: 'Gần gũi, thực tế, ứng dụng, dễ hiểu, truyền cảm hứng.',
+    human_element: 'Người tu tại gia, ứng dụng Phật pháp trong đời sống hiện đại.'
+  },
+  vn_tinh_do: {
+    id: 'vn_tinh_do', name: 'Việt Nam — Tịnh Độ Tông (Niệm Phật)', flag: '🇻🇳',
+    voice_lang: 'Vietnamese', currency: 'VND',
+    culture: 'Niệm Phật A Di Đà, cầu vãng sinh Cực Lạc, tụng kinh A Di Đà, lễ Phật, phóng sinh, cúng dường.',
+    tradition: 'Tịnh Độ Tông (Pure Land)',
+    key_practices: 'Niệm Phật A Di Đà, tụng kinh, trì chú, phóng sinh.',
+    philosophy: 'Tín-Nguyện-Hạnh, cõi Tây Phương Cực Lạc, Phật A Di Đà.',
+    writing_style: 'Thành kính, trang nghiêm, an lạc, thanh tịnh.',
+    human_element: 'Phật tử niệm Phật, hộ niệm, câu chuyện vãng sinh.'
   },
   th_theravada: {
-    id: 'th_theravada', name: 'Thailand (Theravada - Forest Tradition)', flag: '🇹🇭',
+    id: 'th_theravada', name: 'Thái Lan — Theravada (Truyền Thống Rừng)', flag: '🇹🇭',
     voice_lang: 'Thai', currency: 'THB',
     culture: 'Vipassana meditation, monk ordination, merit-making (tam bun), Dhamma talks, forest monasteries, alms rounds.',
-    tradition: 'Theravada (เถรวาท)',
-    key_practices: 'Vipassana, alms giving, Pali chanting.',
-    philosophy: 'Four Noble Truths, Noble Eightfold Path, impermanence.',
+    tradition: 'Theravada (Nguyên Thủy)',
+    key_practices: 'Thiền Vipassana, khất thực, tụng kinh Pali.',
+    philosophy: 'Tứ Diệu Đế, Bát Chánh Đạo, Vô Thường.',
     writing_style: 'Gentle, respectful, practical wisdom, nature metaphors.',
-    human_element: 'Monk\'s forest meditation, family merit-making.'
+    human_element: 'Tăng sĩ thiền trong rừng, gia đình làm phước.'
   },
   kh_theravada: {
-    id: 'kh_theravada', name: 'Cambodia (Theravada - Khmer Buddhism)', flag: '🇰🇭',
+    id: 'kh_theravada', name: 'Campuchia — Theravada (Phật Giáo Khmer)', flag: '🇰🇭',
     voice_lang: 'Khmer', currency: 'KHR',
     culture: 'Angkor Wat heritage, monk blessing ceremonies, Pchum Ben (ancestor festival), traditional Khmer chanting, pagoda life in rural villages.',
-    tradition: 'Theravada (ព្រះពុទ្ធសាសនាថេរវាទ)',
-    key_practices: 'Chanting, meditation, ancestor offerings, monk ordination.',
-    philosophy: 'Karma, merit-making, loving-kindness, ancestral connection.',
+    tradition: 'Theravada (Phật Giáo Khmer)',
+    key_practices: 'Tụng kinh, thiền định, cúng tổ tiên, thọ giới.',
+    philosophy: 'Nghiệp, tạo phước, từ bi, kết nối tổ tiên.',
     writing_style: 'Respectful, traditional, deeply rooted in Khmer history, graceful.',
-    human_element: 'Village elder sharing wisdom, monk blessing family.'
+    human_element: 'Trưởng lão chia sẻ trí tuệ, tăng sĩ chúc phúc.'
   },
   tb_vajrayana: {
-    id: 'tb_vajrayana', name: 'Tibet (Vajrayana Buddhism)', flag: '🇨🇳',
+    id: 'tb_vajrayana', name: 'Tây Tạng — Kim Cương Thừa (Vajrayana)', flag: '🇨🇳',
     voice_lang: 'Tibetan', currency: 'CNY',
     culture: 'Tantric practices, mandala creation, prayer wheels, prayer flags, prostrations, sky burial, Dalai Lama lineage.',
-    tradition: 'Vajrayana (རྡོ་རྗེ་ཐེག་པ)',
-    key_practices: 'Mantra recitation (Om Mani Padme Hum), visualization, deity yoga, sand mandalas.',
-    philosophy: 'Emptiness (śūnyatā), compassion (karuna), Buddha nature.',
+    tradition: 'Kim Cương Thừa (Vajrayana)',
+    key_practices: 'Trì chú Om Mani Padme Hum, quán tưởng, yoga thần chú, mandala.',
+    philosophy: 'Tánh Không, Từ Bi, Phật Tánh.',
     writing_style: 'Mystical, profound, poetic, devotional, mountain imagery.',
-    human_element: 'Lama\'s teachings in Himalayas, pilgrim\'s journey to Mt. Kailash.'
+    human_element: 'Lạt Ma giảng pháp trên Himalaya, hành giả hành hương.'
   },
   jp_zen: {
-    id: 'jp_zen', name: 'Japan (Zen Buddhism)', flag: '🇯🇵',
+    id: 'jp_zen', name: 'Nhật Bản — Thiền Tông (Zen)', flag: '🇯🇵',
     voice_lang: 'Japanese', currency: 'JPY',
     culture: 'Zazen meditation, tea ceremony, rock gardens, calligraphy, haiku poetry, wabi-sabi aesthetics.',
-    tradition: 'Zen (禅宗) - Rinzai & Soto',
-    key_practices: 'Zazen (sitting meditation), kinhin (walking meditation), koan study, mindful work.',
-    philosophy: 'Direct pointing to mind, satori (enlightenment), non-duality, present moment awareness.',
+    tradition: 'Thiền Tông (Zen) — Lâm Tế & Tào Động',
+    key_practices: 'Tọa thiền, kinh hành, tham công án, chánh niệm lao động.',
+    philosophy: 'Trực chỉ nhân tâm, kiến tánh thành Phật, bất nhị.',
     writing_style: 'Minimalist, precise, contemplative, haiku-like brevity, nature imagery.',
-    human_element: 'Monk raking zen garden, businessman\'s zazen practice.'
+    human_element: 'Thiền sư chăm vườn đá, doanh nhân ngồi thiền.'
   },
   us_mindfulness: {
-    id: 'us_mindfulness', name: 'USA (Mindfulness & Engaged Buddhism)', flag: '🇺🇸',
+    id: 'us_mindfulness', name: 'Phương Tây — Chánh Niệm Ứng Dụng', flag: '🇺🇸',
     voice_lang: 'English', currency: 'USD',
     culture: 'MBSR, secular meditation, Buddhist psychology, engaged Buddhism, meditation apps, retreat centers.',
-    tradition: 'Eclectic (Theravada, Zen, Tibetan fusion)',
-    key_practices: 'Mindfulness meditation, loving-kindness, body scan, walking meditation, mindful eating.',
-    philosophy: 'Present moment awareness, non-judgment, compassion, integration with psychology.',
+    tradition: 'Tổng Hợp (Theravada, Thiền, Mật Tông)',
+    key_practices: 'Thiền chánh niệm, từ bi quán, body scan, thiền đi, ăn chánh niệm.',
+    philosophy: 'Sống trong hiện tại, không phán xét, từ bi, kết hợp tâm lý học.',
     writing_style: 'Scientific, accessible, therapeutic, practical, modern language.',
-    human_element: 'Therapist using MBSR, tech worker\'s meditation break.'
+    human_element: 'Chuyên gia tâm lý dùng MBSR, nhân viên IT thiền giữa giờ.'
   },
 };
 
@@ -136,8 +156,27 @@ export const SECONDS_PER_SCENE = 8;
 export type TabId = 'spy' | 'script' | 'studio' | 'seo';
 
 export const TAB_COLORS: Record<TabId, { bg: string; border: string; text: string; shadow: string }> = {
-  spy: { bg: 'bg-[#1a1508]', border: 'border-amber-500/50', text: 'text-amber-300', shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.1)]' },
-  script: { bg: 'bg-[#1a1a08]', border: 'border-yellow-500/50', text: 'text-yellow-300', shadow: 'shadow-[0_0_15px_rgba(234,179,8,0.15)]' },
-  studio: { bg: 'bg-[#150f1a]', border: 'border-purple-500/50', text: 'text-purple-300', shadow: 'shadow-[0_0_15px_rgba(139,92,246,0.15)]' },
-  seo: { bg: 'bg-[#0f1a15]', border: 'border-green-500/50', text: 'text-green-300', shadow: 'shadow-[0_0_15px_rgba(34,197,94,0.15)]' },
+  spy: { bg: 'bg-teal-950/40', border: 'border-teal-500/50', text: 'text-teal-300', shadow: 'shadow-[0_0_15px_rgba(13,148,136,0.15)]' },
+  script: { bg: 'bg-amber-950/30', border: 'border-amber-500/50', text: 'text-amber-300', shadow: 'shadow-[0_0_15px_rgba(212,165,116,0.15)]' },
+  studio: { bg: 'bg-violet-950/30', border: 'border-violet-500/50', text: 'text-violet-300', shadow: 'shadow-[0_0_15px_rgba(139,92,246,0.15)]' },
+  seo: { bg: 'bg-orange-950/30', border: 'border-orange-500/50', text: 'text-orange-300', shadow: 'shadow-[0_0_15px_rgba(232,93,38,0.15)]' },
 };
+
+// ==================================================================================
+// TAB NAMES — Centralized tab labels for Sidebar
+// ==================================================================================
+export const TAB_NAMES: Record<TabId, { name: string; desc: string; icon: string }> = {
+  spy:    { name: '1. DHARMA SPY',   desc: 'Phân tích Video Phật Pháp',   icon: 'fa-brands fa-youtube' },
+  script: { name: '2. PHÁP THOẠI',  desc: 'Viết Kịch Bản Giảng Pháp',   icon: 'fa-solid fa-dharmachakra' },
+  studio: { name: '3. STUDIO',      desc: 'Prompt Video & Ảnh Reference', icon: 'fa-solid fa-place-of-worship' },
+  seo:    { name: '4. SEO MASTER',   desc: 'Tối Ưu Nội Dung & Viral',    icon: 'fa-solid fa-magnifying-glass-chart' },
+};
+
+// ==================================================================================
+// MODE OPTIONS — 3 chế độ video duration
+// ==================================================================================
+export const MODE_OPTIONS = [
+  { id: 'quick', name: '🟢 PHÁP THOẠI NGẮN',  desc: '<60s — Hook nhanh, trọng tâm 1 ý',     scenes: 3, wpm: 130, icon: '⚡', color: 'teal' },
+  { id: 'story', name: '🔵 GIẢNG KINH',        desc: '1-3m — Câu chuyện + giáo lý',          scenes: 5, wpm: 140, icon: '📖', color: 'cyan' },
+  { id: 'deep',  name: '🟣 ĐẠI PHÁP THOẠI',   desc: '>3m — Phân tích sâu, nhiều góc nhìn', scenes: 8, wpm: 120, icon: '🎬', color: 'violet' },
+];

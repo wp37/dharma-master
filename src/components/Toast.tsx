@@ -38,14 +38,14 @@ const ToastContainer: React.FC = () => {
     <div className="fixed top-20 right-6 z-[60] space-y-2 max-w-sm">
       {toasts.map(toast => {
         const colorMap = {
-          error: 'bg-[#1a0505]/95 border-red-500/50 text-red-200',
-          success: 'bg-[#051a0a]/95 border-green-500/50 text-green-200',
-          info: 'bg-[#1a1508]/95 border-yellow-500/50 text-yellow-200',
+          error: 'bg-[#1a0510]/95 border-red-500/50 text-red-200',
+          success: 'bg-[#051a10]/95 border-teal-500/50 text-teal-200',
+          info: 'bg-[#0a0e1a]/95 border-cyan-500/50 text-cyan-200',
         };
         const iconMap = {
           error: 'fa-solid fa-triangle-exclamation text-red-500',
-          success: 'fa-solid fa-check-circle text-green-500',
-          info: 'fa-solid fa-info-circle text-yellow-500',
+          success: 'fa-solid fa-check-circle text-teal-500',
+          info: 'fa-solid fa-info-circle text-cyan-500',
         };
         return (
           <div key={toast.id}
