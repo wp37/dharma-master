@@ -152,20 +152,113 @@ async function callGoogleWithRetry(prompt: string, systemPrompt: string, retries
   throw lastError || new Error("All Google attempts failed.");
 }
 
-// === Main AI Caller ===
+// === OpenRouter API ===
+async function callOpenRouter(prompt: string, systemPrompt: string): Promise<any> {
+  const url = "https://openrouter.ai/api/v1/chat/completions";
+  const body = {
+    model: config.openRouterModel || MODELS.openrouter_default,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" } 
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.openRouterKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': window.location.origin,
+      'X-Title': 'TUAI Dharma Master'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenRouter Error: ${err}`);
+  }
+
+  const data = await res.json();
+  return safeJSONParse(data.choices?.[0]?.message?.content);
+}
+
+// === OpenAI API ===
+async function callOpenAI(prompt: string, systemPrompt: string): Promise<any> {
+  const url = "https://api.openai.com/v1/chat/completions";
+  const body = {
+    model: config.openAiModel || 'gpt-4-turbo-preview',
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.7
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.openAiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI Error: ${err}`);
+  }
+
+  const data = await res.json();
+  return safeJSONParse(data.choices?.[0]?.message?.content);
+}
+
+// === Main AI Caller with Fallbacks ===
 export async function callAI(prompt: string, systemPrompt: string): Promise<any> {
   const { apiEnabled, keyPool } = config;
+  const anyEnabled = apiEnabled.google || apiEnabled.openrouter || apiEnabled.openai;
+  if (!anyEnabled) {
+    throw new Error("❌ Vui lòng bật ít nhất 1 API trong Config!");
+  }
+
   const hasGoogleKeys = keyPool.some(k => k && k.trim() !== '');
 
-  if (!hasGoogleKeys) {
+  // Priority 1: Google Gemini (if enabled and keys are present)
+  if (apiEnabled.google && hasGoogleKeys) {
+    try {
+      return await callGoogleWithRetry(prompt, systemPrompt);
+    } catch (e: any) {
+      console.warn("Google Gemini Failed:", e);
+      if (!apiEnabled.openrouter && !apiEnabled.openai) throw e;
+      // Continue to fallback
+    }
+  } else if (apiEnabled.google && !hasGoogleKeys && !apiEnabled.openrouter && !apiEnabled.openai) {
     throw new Error("❌ Vui lòng nhập ít nhất 1 Gemini API Key!");
   }
 
-  if (apiEnabled.google && hasGoogleKeys) {
-    return await callGoogleWithRetry(prompt, systemPrompt);
+  // Priority 2: OpenRouter (if enabled and key is present)
+  if (apiEnabled.openrouter && config.openRouterKey) {
+    try {
+      return await callOpenRouter(prompt, systemPrompt);
+    } catch (e: any) {
+      console.warn("OpenRouter Failed:", e);
+      if (!apiEnabled.openai) throw e;
+      // Continue to fallback
+    }
+  } else if (apiEnabled.openrouter && !config.openRouterKey && !apiEnabled.openai) {
+    throw new Error("❌ OpenRouter enabled but no API key provided!");
   }
 
-  throw new Error("❌ Không có API key hợp lệ!");
+  // Priority 3: OpenAI (if enabled and key is present)
+  if (apiEnabled.openai && config.openAiKey) {
+    return await callOpenAI(prompt, systemPrompt);
+  } else if (apiEnabled.openai && !config.openAiKey) {
+    throw new Error("❌ OpenAI enabled but no API key provided!");
+  }
+
+  throw new Error("❌ Tất cả các API được bật đều thất bại hoặc thiếu API key hợp lệ!");
 }
 
 // === YouTube Meta Fetcher ===

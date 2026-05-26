@@ -166,16 +166,74 @@ export interface EngagementComments {
   call_to_action: string;
 }
 
+// ==================================================================================
+// SEO 6-SECTION TYPES — Buddhist SEO Optimization Engine
+// ==================================================================================
+
 /**
- * Complete SEO Response
+ * Title Option — 5 variants with hook types
+ */
+export interface SEOTitleOption {
+  title: string;
+  char_count: number;
+  hook_type: "Curiosity" | "Emotion" | "Value" | "Question" | "Authority";
+  seo_score: number; // 1-5
+}
+
+/**
+ * Tag Item — with priority, search volume, competition
+ */
+export interface SEOTagItem {
+  tag: string;
+  priority: "Chính" | "Phụ" | "Long-tail";
+  search_volume: "Cao" | "Trung bình" | "Thấp";
+  competition: "Cao" | "Trung bình" | "Thấp";
+}
+
+/**
+ * Hashtag Set — categorized allocation
+ */
+export interface SEOHashtagSet {
+  broad: string[];
+  niche: string[];
+  topic_specific: string[];
+  branded: string[];
+}
+
+/**
+ * Posting Schedule — optimal times with reasons
+ */
+export interface PostingTime {
+  time: string;
+  reason: string;
+}
+
+/**
+ * Seasonal Keyword Entry — monthly calendar
+ */
+export interface SeasonalKeywordEntry {
+  month: string;
+  event: string;
+  keywords: string[];
+}
+
+/**
+ * Complete SEO Response — 6-Section Output
  */
 export interface SEOResponse {
+  // Legacy fields (backward compat)
   keywords: SEOKeywords;
   hashtags: string[];
   video_description: VideoDescription;
   viral_titles: string[];
   thumbnail_strategy: ThumbnailStrategy;
   engagement_comments: EngagementComments;
+  // New 6-Section fields
+  title_options?: SEOTitleOption[];
+  tags_30?: SEOTagItem[];
+  hashtag_set?: SEOHashtagSet;
+  posting_schedule?: PostingTime[];
+  seasonal_keywords?: SeasonalKeywordEntry[];
 }
 
 /**

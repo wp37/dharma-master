@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
 import { callAI } from '../services/aiService';
 import { SYSTEM_PROMPT_SCRIPT_WRITER, STYLE_RECOMMENDATION_PROMPT } from '../data/prompts';
-import { BUDDHISM_CONTEXTS, VISUAL_STYLES, SECONDS_PER_SCENE, MODE_OPTIONS } from '../data/constants';
+import { BUDDHISM_CONTEXTS, VISUAL_STYLES, SECONDS_PER_SCENE, MODE_OPTIONS, VOICE_STYLES } from '../data/constants';
 import { showToast } from '../components/Toast';
 
 interface Props { onScriptGenerated: (segments: any[], style: string) => void; initialTopic?: string; }
 
 const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' }) => {
   const [topic, setTopic] = useState(initialTopic);
+  const [contentContext, setContentContext] = useState('');
   const [duration, setDuration] = useState(1);
   const [market, setMarket] = useState('vn_mahayana');
   const [style, setStyle] = useState('auto');
   const [selectedMode, setSelectedMode] = useState('quick');
+  const [voiceStyle, setVoiceStyle] = useState(() => {
+    try {
+      return localStorage.getItem('dharma_last_voice_style') || 'the_dharma_teacher';
+    } catch {
+      return 'the_dharma_teacher';
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [segments, setSegments] = useState<any[]>([]);
   const [styleRec, setStyleRec] = useState<any>(null);
   const [isRecommending, setIsRecommending] = useState(false);
+  const [genMode, setGenMode] = useState<'creative' | 'competitor'>('creative');
+  const [competitorScript, setCompetitorScript] = useState('');
 
   React.useEffect(() => { if (initialTopic) setTopic(initialTopic); }, [initialTopic]);
 
@@ -37,17 +47,31 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
         setStyle(rec.primary_style);
         showToast(`✨ AI đề xuất: ${VISUAL_STYLES.find(s => s.id === rec.primary_style)?.name || rec.primary_style}`, 'success');
       }
+      if (rec.primary_voice_style) {
+        setVoiceStyle(rec.primary_voice_style);
+        showToast(`🎙️ AI đề xuất giọng: ${VOICE_STYLES.find(v => v.id === rec.primary_voice_style)?.name || rec.primary_voice_style}`, 'success');
+      }
     } catch (e: any) { showToast(e.message); }
     finally { setIsRecommending(false); }
   };
 
   const handleGenerate = async () => {
     if (!topic) return showToast('Nhập chủ đề Phật pháp!');
+    if (genMode === 'competitor' && !competitorScript.trim()) {
+      return showToast('Vui lòng nhập kịch bản của đối thủ!');
+    }
     setLoading(true);
     try {
       const styleObj = VISUAL_STYLES.find(s => s.id === style);
+      const voiceObj = VOICE_STYLES.find(v => v.id === voiceStyle);
       const mk = BUDDHISM_CONTEXTS[market] || BUDDHISM_CONTEXTS['vn_mahayana'];
-      const prompt = `TOPIC: "${topic}"\nDURATION: ${duration}m\nSCENE_COUNT: ${scenes}\nTARGET_LANGUAGE: ${mk.voice_lang}\nTARGET_MARKET: ${mk.name}\nTRADITION: ${mk.tradition}\nKEY_PRACTICES: ${mk.key_practices}\nPHILOSOPHY: ${mk.philosophy}\nWRITING_STYLE: ${mk.writing_style}\nHUMAN_ELEMENT: ${mk.human_element}\nCULTURE: ${mk.culture}\nVISUAL_STYLE: ${styleObj?.name || 'Auto'}\nGENERATE JSON OBJECT.`;
+      
+      const modeInstruction = genMode === 'creative' 
+        ? `GENERATION_MODE: SÁNG TẠO (CREATIVE). Hãy tự do sáng tạo kịch bản nguyên bản, mới lạ, sâu sắc và đầy cảm xúc dựa trên chủ đề Phật pháp.` 
+        : `GENERATION_MODE: BÁM SÁT KỊCH BẢN ĐỐI THỦ (FOLLOW COMPETITOR). Hãy phân tích chặt chẽ cấu trúc phân đoạn, thời lượng, mạch logic, cách đặt câu hỏi hook đầu video, các mốc chuyển cảnh và cách phân bổ thời lượng của kịch bản gốc của đối thủ dưới đây:\n\n--- KỊCH BẢN ĐỐI THỦ ---\n${competitorScript}\n---------------------\n\nHãy mô phỏng chính xác cấu trúc và nhịp điệu trên, nhưng viết lại nội dung mới mẻ, mang chiều sâu triết lý Phật pháp cao nhất dựa trên chủ đề Phật pháp mới.`;
+
+      const contextBlock = contentContext.trim() ? `\nCONTENT_CONTEXT (Nội dung/bối cảnh người dùng cung cấp — hãy dựa vào đây làm nguồn tư liệu chính để viết kịch bản, giữ đúng tinh thần và ý nghĩa của nội dung gốc):\n---\n${contentContext.trim()}\n---` : '';
+      const prompt = `TOPIC: "${topic}"\nDURATION: ${duration}m\nSCENE_COUNT: ${scenes}\nTARGET_LANGUAGE: ${mk.voice_lang}\nTARGET_MARKET: ${mk.name}\nTRADITION: ${mk.tradition}\nKEY_PRACTICES: ${mk.key_practices}\nPHILOSOPHY: ${mk.philosophy}\nWRITING_STYLE: ${mk.writing_style}\nHUMAN_ELEMENT: ${mk.human_element}\nCULTURE: ${mk.culture}\nVISUAL_STYLE: ${styleObj?.name || 'Auto'}\nVOICE_STYLE: ${voiceObj?.name || 'Default'}\nVOICE_STYLE_PROMPT_MODIFIER: ${voiceObj?.prompt_modifier || ''}\n${modeInstruction}${contextBlock}\nGENERATE JSON OBJECT.`;
       const json = await callAI(prompt, SYSTEM_PROMPT_SCRIPT_WRITER);
       let segs = json.script || (Array.isArray(json) ? json : []);
       let enforce = '';
@@ -68,6 +92,7 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
         localStorage.setItem('dharma_last_script', JSON.stringify(segs));
         localStorage.setItem('dharma_last_topic', topic);
         localStorage.setItem('dharma_last_style', style);
+        localStorage.setItem('dharma_last_voice_style', voiceStyle);
       } catch { /* quota exceeded — ignore */ }
     } catch (e: any) { showToast(e.message); }
     finally { setLoading(false); }
@@ -89,6 +114,64 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
           <div>
             <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Chủ Đề Phật Pháp</label>
             <input value={topic} onChange={e => setTopic(e.target.value)} className="w-full bg-[#060810] border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-teal-500/50 placeholder-white/20 transition-colors" placeholder="VD: Tứ Diệu Đế, Thiền Vipassana, Từ Bi Quán..." />
+          </div>
+
+          {/* === NỘI DUNG / BỐI CẢNH === */}
+          <div>
+            <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block flex items-center gap-2">
+              <i className="fa-solid fa-scroll text-amber-400" /> NỘI DUNG / BỐI CẢNH (TÙY CHỌN)
+            </label>
+            <textarea
+              value={contentContext}
+              onChange={e => setContentContext(e.target.value)}
+              className="w-full bg-[#060810] border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-amber-500/50 placeholder-white/20 transition-colors min-h-[100px] resize-y leading-relaxed"
+              placeholder="Dán nội dung bài viết, trích đoạn kinh điển, câu chuyện, hoặc bối cảnh bạn muốn AI dựa vào để viết kịch bản... AI sẽ dùng nội dung này làm nguồn tư liệu chính."
+            />
+            <div className="text-[10px] text-slate-600 mt-1 flex items-center gap-1">
+              <i className="fa-solid fa-info-circle" /> Nhập nội dung gốc để AI viết kịch bản sát ý hơn. Để trống nếu muốn AI tự sáng tạo.
+            </div>
+          </div>
+
+          {/* === GENERATION MODE (CREATIVE VS COMPETITOR) === */}
+          <div className="bg-[#0a0e1a] border border-white/5 rounded-xl p-4 animate-scale-in">
+            <label className="text-xs font-bold text-slate-400 uppercase mb-3 block flex items-center gap-2">
+              <i className="fa-solid fa-wand-magic-sparkles text-amber-400" /> ĐỊNH HƯỚNG NỘI DUNG SÁNG TẠO
+            </label>
+            <div className="grid grid-cols-2 gap-3 mb-1">
+              <button 
+                type="button"
+                onClick={() => setGenMode('creative')}
+                className={`p-3 rounded-lg border text-center transition-all font-bold text-[11px] flex items-center justify-center gap-2 ${
+                  genMode === 'creative' 
+                    ? 'bg-amber-950/30 border-amber-500/50 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.15)]' 
+                    : 'bg-[#0f1424] border-white/5 text-slate-400 hover:bg-[#111827] hover:text-white'
+                }`}
+              >
+                <i className="fa-solid fa-compass text-[13px]" /> Sáng Tạo Mới
+              </button>
+              <button 
+                type="button"
+                onClick={() => setGenMode('competitor')}
+                className={`p-3 rounded-lg border text-center transition-all font-bold text-[11px] flex items-center justify-center gap-2 ${
+                  genMode === 'competitor' 
+                    ? 'bg-violet-950/20 border-violet-500/50 text-violet-300 shadow-[0_0_10px_rgba(139,92,246,0.15)]' 
+                    : 'bg-[#0f1424] border-white/5 text-slate-400 hover:bg-[#111827] hover:text-white'
+                }`}
+              >
+                <i className="fa-solid fa-copy text-[13px]" /> Bám Sát Đối Thủ
+              </button>
+            </div>
+            {genMode === 'competitor' && (
+              <div className="space-y-1.5 animate-[fadeIn_0.3s_ease-out] mt-3">
+                <label className="text-[10px] font-bold text-violet-400 uppercase block">Dán Kịch Bản Gốc / Transcript Đối Thủ</label>
+                <textarea 
+                  value={competitorScript} 
+                  onChange={e => setCompetitorScript(e.target.value)} 
+                  className="w-full bg-[#060810] border border-violet-500/20 rounded-lg p-3 text-xs text-white outline-none focus:border-violet-500/50 placeholder-white/20 min-h-[100px] resize-none"
+                  placeholder="Dán kịch bản video viral của đối thủ vào đây. AI sẽ bóc tách cấu trúc để tạo ra kịch bản mới cho bạn..."
+                />
+              </div>
+            )}
           </div>
 
           {/* === MODE SELECTION GRID === */}
@@ -154,10 +237,19 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
                 <div className="flex items-start gap-2 mb-2">
                   <i className="fa-solid fa-lightbulb text-amber-400 mt-0.5" />
                   <div className="flex-1">
-                    <div className="text-[11px] font-bold text-amber-300 mb-0.5">AI ĐỀ XUẤT: {VISUAL_STYLES.find(s => s.id === styleRec.primary_style)?.name || styleRec.primary_style}</div>
+                    <div className="text-[11px] font-bold text-amber-300 mb-0.5">AI ĐỀ XUẤT VISUAL: {VISUAL_STYLES.find(s => s.id === styleRec.primary_style)?.name || styleRec.primary_style}</div>
                     <div className="text-[10px] text-slate-400">{styleRec.primary_reason}</div>
                   </div>
                 </div>
+                {styleRec.primary_voice_style && (
+                  <div className="flex items-start gap-2 mb-2 pt-2 border-t border-white/5">
+                    <i className="fa-solid fa-microphone-lines text-violet-400 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-[11px] font-bold text-violet-300 mb-0.5">AI ĐỀ XUẤT GIỌNG ĐỌC: {VOICE_STYLES.find(v => v.id === styleRec.primary_voice_style)?.name || styleRec.primary_voice_style}</div>
+                      <div className="text-[10px] text-slate-400">{styleRec.primary_voice_reason}</div>
+                    </div>
+                  </div>
+                )}
                 {styleRec.alternative_style && (
                   <div className="flex items-start gap-2 pt-2 border-t border-white/5">
                     <i className="fa-solid fa-shuffle text-teal-400 mt-0.5 text-[10px]" />
@@ -185,6 +277,25 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
                   className={`text-[10px] p-2 rounded border text-left transition-all ${style === s.id ? 'bg-teal-900/30 border-teal-500/50 text-white shadow-[0_0_10px_rgba(13,148,136,0.2)]' : 'bg-[#0f1424] border-white/5 text-slate-400 hover:bg-[#111827] hover:text-white'}`}>
                   <div className="font-bold mb-0.5">{s.name}</div>
                   <div className="text-[9px] opacity-70 truncate">{s.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* === VOICE STYLE === */}
+          <div className="bg-[#0a0e1a] border border-white/5 rounded-xl p-4 animate-scale-in">
+            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block flex items-center gap-2">
+              <i className="fa-solid fa-microphone-lines text-violet-400" /> GIỌNG ĐỌC & TONE DIỄN TẢ (VOICE STYLE)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {VOICE_STYLES.map(v => (
+                <button key={v.id} onClick={() => setVoiceStyle(v.id)}
+                  className={`text-[10px] p-2.5 rounded border text-left transition-all relative ${voiceStyle === v.id ? 'bg-violet-900/20 border-violet-500/50 text-white shadow-[0_0_10px_rgba(139,92,246,0.15)] animate-glow-pulse' : 'bg-[#0f1424] border-white/5 text-slate-400 hover:bg-[#111827] hover:text-white'}`}>
+                  <div className="font-bold mb-0.5 flex items-center gap-1.5">
+                    <span>{v.name}</span>
+                    {voiceStyle === v.id && <span className="absolute top-1 right-1 text-[8px] bg-violet-600 text-violet-100 px-1 rounded-sm scale-90">Selected</span>}
+                  </div>
+                  <div className="text-[9px] opacity-70 leading-normal">{v.desc}</div>
                 </button>
               ))}
             </div>

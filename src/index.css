@@ -215,3 +215,22 @@ body {
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;
 }
+
+/* ===== Scale In ===== */
+@keyframes scaleIn {
+  from { transform: scale(0.97); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.animate-scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ===== Glow Pulse ===== */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.4); }
+  50% { box-shadow: 0 0 18px rgba(139, 92, 246, 0.35); border-color: rgba(139, 92, 246, 0.7); }
+}
+.animate-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+

@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import type { TabId } from './data/constants';
 import { loadApiConfig, getValidKeyCount, hasAnyApiKey } from './services/aiService';
+import { getCurrentLicense } from './services/licenseService';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ApiKeyModal from './components/ApiKeyModal';
+import LicenseGate from './components/LicenseGate';
 import ToastContainer from './components/Toast';
 import SpyModule from './pages/SpyModule';
 import ScriptModule from './pages/ScriptModule';
 import StudioModule from './pages/StudioModule';
 import SeoModule from './pages/SeoModule';
+import AdminModule from './pages/AdminModule';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('spy');
+  // Detect /admin URL path for direct admin access
+  const isAdminUrl = window.location.pathname.toLowerCase().includes('/admin');
+  const [activeTab, setActiveTab] = useState<TabId>(isAdminUrl ? 'admin' : 'spy');
+  const [licensed, setLicensed] = useState(true); // TODO: set back to false for commercial release
   const [showConfig, setShowConfig] = useState(false);
   const [uiLang, setUiLang] = useState<'vi' | 'en'>('vi');
   const [keyCount, setKeyCount] = useState(0);
@@ -22,6 +28,8 @@ const App: React.FC = () => {
     loadApiConfig();
     setKeyCount(getValidKeyCount());
     if (!hasAnyApiKey()) setShowConfig(true);
+    // Check license status on mount
+    // setLicensed(getCurrentLicense().valid); // TODO: uncomment for commercial release
   }, []);
 
   const handleConfigClose = () => {
@@ -31,13 +39,23 @@ const App: React.FC = () => {
 
   const handleScriptGenerated = (segs: any[], _style: string) => {
     setScriptSegments(segs);
-    setActiveTab('studio');
+    setActiveTab('seo');
   };
 
   const handleUseStrategy = (title: string) => {
     setStrategyTopic(title);
     setActiveTab('script');
   };
+
+  // License Gate — block content tabs, always allow admin tab
+  if (!licensed && activeTab !== 'admin') {
+    return (
+      <div className="min-h-screen flex flex-col relative z-10">
+        <LicenseGate onActivated={() => setLicensed(true)} />
+        <ToastContainer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col relative z-10">
@@ -66,6 +84,9 @@ const App: React.FC = () => {
           </div>
           <div style={{ display: activeTab === 'seo' ? 'block' : 'none' }}>
             <SeoModule initialTopic={strategyTopic} />
+          </div>
+          <div style={{ display: activeTab === 'admin' ? 'block' : 'none' }}>
+            <AdminModule />
           </div>
         </div>
       </main>

@@ -3,8 +3,9 @@
 > **Brand: TUAI / 08.14.666.040**
 > **API: Google Gemini (duy nhất)**
 > **Template gốc:** `c:\Users\Vo Tung\Downloads\PSY\`
-> **Phiên bản guide:** v2.1 (cập nhật 2026-05-10)
+> **Phiên bản guide:** v2.3 (cập nhật 2026-05-11 — cập nhật cấu trúc Dharma Master)
 > **Đã deploy thành công:** Philosophy, Criminal, Dharma, Horror
+> **Deploy URL mẫu (Dharma):** https://dharma-master.vercel.app
 
 ---
 
@@ -24,10 +25,12 @@
 ├── 📁 src/
 │   ├── index.tsx           ← React entry
 │   ├── index.css           ← CSS scrollbar + body + theme
-│   ├── App.tsx             ← Layout + 4 tabs + footer
+│   ├── App.tsx             ← Layout + 4 tabs (display:none) + footer
 │   ├── 📁 data/
-│   │   ├── constants.ts    ← ⭐ Markets, Styles, Checklist, TAB_COLORS
-│   │   └── prompts.ts      ← ⭐ 4 AI System Prompts
+│   │   ├── constants.ts    ← ⭐ BUDDHISM_CONTEXTS, Styles, Checklist, TAB_COLORS
+│   │   ├── prompts.ts      ← ⭐ 4 AI System Prompts
+│   │   ├── promptTypes.ts  ← TypeScript interfaces cho AI responses
+│   │   └── promptConstants.ts ← Hằng số doanh thu, engagement, audio
 │   ├── 📁 services/
 │   │   └── aiService.ts    ← Gemini Engine + Storage Keys
 │   ├── 📁 components/
@@ -79,9 +82,9 @@ npm install
 
 ---
 
-## ✏️ BƯỚC 3: SỬA 12 FILE NGÁCH
+## ✏️ BƯỚC 3: SỬA 14 FILE NGÁCH
 
-> ⚠️ **QUAN TRỌNG:** Phải sửa TẤT CẢ 12 file bên dưới để đồng bộ ngách hoàn chỉnh.
+> ⚠️ **QUAN TRỌNG:** Phải sửa TẤT CẢ 14 file bên dưới để đồng bộ ngách hoàn chỉnh.
 > Chỉ sửa 4 file gốc (như hướng dẫn cũ) sẽ bị lệch theme, màu sắc, storage keys.
 
 ### 3.1 `index.html` — Title + Meta
@@ -104,13 +107,35 @@ export const MODELS = {
 };
 
 // Sửa toàn bộ:
-// 1. TARGET_MARKETS — Thị trường ngách (6 markets)
-// 2. VISUAL_STYLES — Phong cách visual (6 styles)
+// 1. BUDDHISM_CONTEXTS (hoặc TARGET_MARKETS tùy ngách) — Ngữ cảnh/Thị trường
+// 2. VISUAL_STYLES — Phong cách visual (10 styles)
 // 3. SEO_CHECKLIST_DATA — Checklist SEO theo ngách
 // 4. TAB_COLORS — Màu sắc 4 tab (spy, script, studio, seo)
 ```
 
-**Mẫu TARGET_MARKETS:**
+> ⚠️ **Dharma Master** dùng `BUDDHISM_CONTEXTS` (interface `BuddhismContext`) thay vì `TARGET_MARKETS` cũ.
+> Mỗi context có thêm: `tradition`, `key_practices`, `philosophy`, `writing_style`, `human_element`.
+> Các ngách khác có thể giữ `TARGET_MARKETS` đơn giản hơn.
+
+**Mẫu BUDDHISM_CONTEXTS (Dharma):**
+```typescript
+export const BUDDHISM_CONTEXTS: Record<string, BuddhismContext> = {
+  vn_mahayana: {
+    id: 'vn_mahayana', name: 'Việt Nam — Đại Thừa (Thiền Tông)', flag: '🇻🇳',
+    voice_lang: 'Vietnamese', currency: 'VND',
+    culture: 'Thiền Buddhism fusion...',
+    tradition: 'Đại Thừa (Mahayana)',
+    key_practices: 'Thiền định, tụng kinh...',
+    philosophy: 'Con đường Bồ Tát, từ bi...',
+    writing_style: 'Warm, poetic, respectful...',
+    human_element: 'Câu chuyện chùa làng...'
+  },
+  // vn_phatgiao, vn_tinh_do, th_theravada, kh_theravada,
+  // tb_vajrayana, jp_zen, us_mindfulness
+};
+```
+
+**Mẫu TARGET_MARKETS (các ngách khác):**
 ```typescript
 export const TARGET_MARKETS: Record<string, TargetMarket> = {
   vn_[ngach]: { id: 'vn_[ngach]', name: 'Vietnam ([Tên ngách])', flag: '🇻🇳', voice_lang: 'Vietnamese', currency: 'VND', culture: '[Mô tả văn hóa]' },
@@ -129,7 +154,7 @@ export const VISUAL_STYLES: VisualStyle[] = [
 
 ---
 
-### 3.3 `src/data/prompts.ts` — 3 Prompts chính
+### 3.3 `src/data/prompts.ts` — 4 Prompts chính
 
 | Prompt | Tab | Cần sửa |
 |---|---|---|
@@ -137,6 +162,34 @@ export const VISUAL_STYLES: VisualStyle[] = [
 | `SYSTEM_PROMPT_SCRIPT_WRITER` | Tab 2 | Chuyên gia viết kịch bản ngách mới |
 | `SYSTEM_PROMPT_SEO_MASTER` | Tab 4 | SEO chuyên gia ngách mới |
 | `SYSTEM_PROMPT_MARKET_ANALYST` | (backup) | Phân tích thị trường ngách mới |
+
+> ⚠️ `prompts.ts` import từ `promptTypes.ts` và `promptConstants.ts`. Khi clone, phải sửa cả 3 file.
+
+---
+
+### 3.3b `src/data/promptTypes.ts` — TypeScript Interfaces
+
+Định nghĩa kiểu dữ liệu cho tất cả AI responses:
+- `SpyAnalysisResponse` — Kết quả phân tích Spy
+- `ScriptResponse` / `ScriptScene` — Kịch bản
+- `SEOResponse` — SEO output
+- `MarketAnalysisResponse` — Phân tích thị trường
+
+> Khi clone: Đổi tên interface nếu cần, đổi giá trị enum (VD: `"Dharma Talk"` → `"Crime Profile"`).
+
+---
+
+### 3.3c `src/data/promptConstants.ts` — Hằng số Prompt
+
+Chứa các hằng số dùng trong prompts:
+- `REVENUE_CONSTANTS` — CPM, RPM, earnings theo ngách
+- `ENGAGEMENT_METRICS` — CTR, retention, viral
+- `AUDIO_STRATEGY_DEFAULTS` — Giọng, nhạc, hiệu ứng âm thanh
+- `HOOK_TIMING` — Thời gian hook
+- `MARKET_CONSTANTS` — Thị trường, khách hàng
+- `SCRIPT_MODES` — Các mode kịch bản
+
+> Khi clone: Đổi toàn bộ giá trị cho phù hợp ngách mới.
 
 ---
 
@@ -499,14 +552,92 @@ npx -y vercel --prod --yes
 
 ---
 
-## ✅ CHECKLIST ĐẦY ĐỦ (12 file + deploy)
+## 🔥 BƯỚC 7: TỐI ƯU SAU DEPLOY (BẮT BUỘC)
+
+> ⚠️ **2 lỗi nghiêm trọng trong template gốc** đã được phát hiện và sửa tại Dharma Master.
+> **Phải áp dụng cho TẤT CẢ các tool đã clone.**
+
+---
+
+### 7.1 AI Phân Tích Bằng Tiếng Việt — `src/pages/SpyModule.tsx`
+
+**Vấn đề:** AI trả kết quả phân tích bằng tiếng Anh mặc dù giao diện tiếng Việt.
+
+**Cách sửa:** Thêm chỉ thị `RESPOND ALL TEXT FIELDS IN VIETNAMESE` vào prompt trong hàm `handleAnalyze`:
+
+```tsx
+// Tìm dòng prompt += trong hàm handleAnalyze (khoảng dòng 28-29)
+// TRƯỚC (SAI):
+prompt += `\nANALYZE [NGÁCH] CONTENT.`;
+
+// SAU (ĐÚNG):
+prompt += `\nANALYZE [NGÁCH] CONTENT. RESPOND ALL TEXT FIELDS IN VIETNAMESE.`;
+```
+
+> 💡 Áp dụng tương tự cho `ScriptModule.tsx` và `SeoModule.tsx` nếu output ra tiếng Anh.
+
+---
+
+### 7.2 Giữ Phiên Làm Việc Khi Chuyển Tab — `src/App.tsx`
+
+**Vấn đề:** Chuyển từ Tab 1 → Tab 2 → quay lại Tab 1 thì mất toàn bộ dữ liệu phân tích (URL, kết quả AI, metadata...).
+
+**Nguyên nhân:** Template gốc dùng `switch/case` trong `renderPage()` — chỉ render module active, các module khác bị **unmount** (hủy hoàn toàn) → mất state.
+
+**Cách sửa:** Render TẤT CẢ 4 module cùng lúc, dùng `display: none` để ẩn module không active:
+
+```tsx
+// ===== TRƯỚC (SAI — mất state khi chuyển tab) =====
+const renderPage = () => {
+  switch (activeTab) {
+    case 'spy': return <SpyModule onUseStrategy={handleUseStrategy} />;
+    case 'script': return <ScriptModule onScriptGenerated={handleScriptGenerated} initialTopic={strategyTopic} />;
+    case 'studio': return <StudioModule segments={scriptSegments} />;
+    case 'seo': return <SeoModule initialTopic={strategyTopic} />;
+    default: return <SpyModule onUseStrategy={handleUseStrategy} />;
+  }
+};
+
+// Trong JSX:
+<div className="flex-1 ...">
+  {renderPage()}
+</div>
+
+
+// ===== SAU (ĐÚNG — giữ state khi chuyển tab) =====
+// XÓA hàm renderPage() hoàn toàn.
+// Trong JSX, thay {renderPage()} bằng:
+
+<div className="flex-1 ...">
+  <div style={{ display: activeTab === 'spy' ? 'block' : 'none' }}>
+    <SpyModule onUseStrategy={handleUseStrategy} />
+  </div>
+  <div style={{ display: activeTab === 'script' ? 'block' : 'none' }}>
+    <ScriptModule onScriptGenerated={handleScriptGenerated} initialTopic={strategyTopic} />
+  </div>
+  <div style={{ display: activeTab === 'studio' ? 'block' : 'none' }}>
+    <StudioModule segments={scriptSegments} />
+  </div>
+  <div style={{ display: activeTab === 'seo' ? 'block' : 'none' }}>
+    <SeoModule initialTopic={strategyTopic} />
+  </div>
+</div>
+```
+
+> ⚠️ **LƯU Ý:** Tên props (`onUseStrategy`, `onScriptGenerated`, `initialTopic`, `segments`) có thể khác nhau giữa các tool clone. Giữ nguyên tên props hiện tại của mỗi tool, chỉ đổi cách render từ `switch/case` sang `display: none`.
+
+---
+
+## ✅ CHECKLIST ĐẦY ĐỦ (14 file + deploy + tối ưu)
 
 ```
 [ ] Copy template (Bước 1) — KHÔNG copy file .php
 [ ] npm install (Bước 2)
 [ ] Sửa index.html (title + meta)
-[ ] Sửa constants.ts (markets, styles, checklist, tab_colors)
+[ ] Sửa constants.ts (BUDDHISM_CONTEXTS/markets, styles, checklist, tab_colors)
 [ ] Sửa prompts.ts (4 prompts)
+[ ] Sửa promptTypes.ts (interfaces + enum values)
+[ ] Sửa promptConstants.ts (revenue, engagement, audio, market constants)
 [ ] Sửa Header.tsx (tên app + icon + màu)
 [ ] Sửa Sidebar.tsx (tên tab + icon + màu hover)
 [ ] Sửa index.css (body bg + gradient + selection + pulseGlow)
@@ -521,6 +652,8 @@ npx -y vercel --prod --yes
 [ ] Xóa file .php gốc nếu có
 [ ] git init → git add → git commit
 [ ] npx vercel --prod --yes → deploy
+[ ] ⭐ Bước 7.1: Thêm "RESPOND ALL TEXT FIELDS IN VIETNAMESE" vào SpyModule prompt
+[ ] ⭐ Bước 7.2: Đổi App.tsx từ switch/case sang display:none (giữ phiên)
 ```
 
 ---
@@ -534,6 +667,8 @@ npx -y vercel --prod --yes
 | 3 | Copy file `.php` 200KB+ vào repo | Repo phình to vô nghĩa | Xóa `.php` trước khi commit |
 | 4 | Dùng `&&` trong PowerShell cũ | Lệnh lỗi syntax | Chạy từng lệnh riêng hoặc dùng `;` |
 | 5 | Dùng `--name` flag với Vercel CLI mới | Warning deprecated | Bỏ `--name`, đổi tên trên Dashboard |
+| 6 | Giữ `renderPage()` switch/case trong App.tsx | Mất toàn bộ data khi chuyển tab qua lại | Đổi sang `display: none` (Bước 7.2) |
+| 7 | Quên thêm `RESPOND ALL TEXT FIELDS IN VIETNAMESE` | AI trả kết quả tiếng Anh | Thêm vào prompt SpyModule (Bước 7.1) |
 
 ---
 
