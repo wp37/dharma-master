@@ -11,9 +11,8 @@ function downloadFile(content: string, fileName: string, mimeType: string) {
 }
 
 const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
-  const [mode, setMode] = useState<'video' | 'image'>('video');
   const [media, setMedia] = useState<Record<string, string>>({});
-  const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
+  const [generatingMap, setGeneratingMap] = useState<Record<string, boolean>>({});
   const [showExport, setShowExport] = useState(false);
 
   // localStorage fallback — read saved script if no prop data
@@ -25,20 +24,61 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
     } catch { return []; }
   }, [propSegments]);
 
+  const initialMode = React.useMemo(() => {
+    const hasVideo = segments.some(s => s.video_prompt && s.video_prompt.trim() !== '');
+    const hasImage = segments.some(s => s.image_prompt && s.image_prompt.trim() !== '');
+    if (!hasVideo && hasImage) return 'image';
+    return 'video';
+  }, [segments]);
+
+  const [mode, setMode] = useState<'video' | 'image'>(initialMode);
+
+  React.useEffect(() => {
+    const hasVideo = segments.some(s => s.video_prompt && s.video_prompt.trim() !== '');
+    const hasImage = segments.some(s => s.image_prompt && s.image_prompt.trim() !== '');
+    if (!hasVideo && hasImage) {
+      setMode('image');
+    } else {
+      setMode('video');
+    }
+  }, [segments]);
+
   const copy = (t: string) => { navigator.clipboard.writeText(t); showToast('✅ Đã copy!', 'success'); };
 
-  const genMedia = async (idx: number) => {
-    if (loadingIdx !== null) return;
-    setLoadingIdx(idx);
+  const genMedia = async (idx: number, isParallelCall = false) => {
+    const key = `${idx}_${mode}`;
+    if (generatingMap[key]) return;
+    
+    setGeneratingMap(prev => ({ ...prev, [key]: true }));
     try {
       const seg = segments[idx];
       let prompt = mode === 'video' ? seg.video_prompt : seg.image_prompt;
+      if (!prompt) {
+        if (!isParallelCall) showToast('Không tìm thấy prompt cho phân cảnh này.');
+        return;
+      }
       prompt += mode === 'video' ? ', 8k, cinematic lighting --no text' : ', masterpiece, 8k';
       const result = await generateImage(prompt, mode === 'video' ? '16:9' : '1:1');
-      if (result) { setMedia(prev => ({ ...prev, [`${idx}_${mode}`]: result })); }
-      else showToast('Lỗi Safety/API. Thử prompt khác.');
-    } catch (e: any) { showToast(e.message); }
-    finally { setLoadingIdx(null); }
+      if (result) {
+        setMedia(prev => ({ ...prev, [key]: result }));
+      } else {
+        if (!isParallelCall) showToast('Lỗi Safety/API. Thử prompt khác.');
+      }
+    } catch (e: any) {
+      if (!isParallelCall) showToast(e.message);
+    } finally {
+      setGeneratingMap(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const genAllParallel = async () => {
+    const activeGenerating = Object.values(generatingMap).some(Boolean);
+    if (activeGenerating) return;
+    
+    showToast('🚀 Bắt đầu vẽ song song tất cả các phân cảnh kịch bản...', 'success');
+    const promises = segments.map((_, idx) => genMedia(idx, true));
+    await Promise.all(promises);
+    showToast('✨ Hoàn thành vẽ toàn bộ phân cảnh song song!', 'success');
   };
 
   const exportCSV = () => {
@@ -75,6 +115,19 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h2 className="text-xl font-bold text-white flex items-center gap-2"><i className="fa-solid fa-place-of-worship text-violet-400" /> Xưởng Sáng Tạo Phật Giáo</h2>
         <div className="flex items-center gap-2">
+          {/* Nút Tạo ảnh song song hàng loạt */}
+          <button 
+            onClick={genAllParallel} 
+            disabled={Object.values(generatingMap).some(Boolean)}
+            className="px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 bg-gradient-to-r from-amber-600 to-amber-800 hover:from-amber-500 hover:to-amber-700 text-white border border-amber-500/30 transition-all shadow-[0_0_15px_rgba(245,158,11,0.2)] disabled:opacity-50"
+          >
+            {Object.values(generatingMap).some(Boolean) ? (
+              <><i className="fa-solid fa-spinner animate-spin" /> Đang vẽ song song...</>
+            ) : (
+              <><i className="fa-solid fa-wand-magic-sparkles animate-pulse" /> Vẽ tất cả song song</>
+            )}
+          </button>
+          
           <div className="flex bg-[#0a0e1a] rounded p-1 border border-white/5">
             <button onClick={() => setMode('video')} className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-colors ${mode === 'video' ? 'bg-cyan-900/50 text-cyan-100 shadow' : 'text-slate-400 hover:text-white'}`}><i className="fa-solid fa-video" /> VIDEO</button>
             <button onClick={() => setMode('image')} className={`px-4 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-colors ${mode === 'image' ? 'bg-purple-900/50 text-purple-100 shadow' : 'text-slate-400 hover:text-white'}`}><i className="fa-solid fa-image" /> ẢNH</button>
@@ -97,8 +150,10 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
         {segments.map((seg, idx) => {
           const prompt = mode === 'video' ? seg.video_prompt : seg.image_prompt;
           const result = media[`${idx}_${mode}`];
+          const isGenerating = generatingMap[`${idx}_${mode}`];
+          
           return (
-            <div key={idx} className="cosmic-card p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-start hover:!border-teal-500/20 transition-colors">
+            <div key={idx} className="cosmic-card p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-start hover:!border-teal-500/20 transition-colors relative overflow-hidden">
               <div className={`px-3 py-1.5 rounded text-xs font-bold text-white h-fit shadow-lg ${mode === 'video' ? 'bg-cyan-900/50' : 'bg-purple-900/50'}`}>CẢNH {idx + 1}</div>
               <div className="flex-1 w-full">
                 <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">{mode === 'video' ? '🎬 PROMPT VIDEO' : '🖼️ PROMPT HÌNH ẢNH'}</div>
@@ -106,12 +161,19 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
                   <p className="text-xs text-slate-300 font-mono mb-3 bg-[#060810]/50 p-3 rounded border border-white/5 leading-relaxed pr-10">{prompt || 'Chưa có prompt'}</p>
                   <button onClick={() => copy(prompt || '')} className="absolute top-2 right-2 p-1.5 bg-[#0a0e1a] text-slate-300 rounded hover:bg-teal-900/50 hover:text-white border border-white/5"><i className="fa-solid fa-copy" /></button>
                 </div>
-                <button onClick={() => genMedia(idx)} disabled={loadingIdx !== null}
-                  className={`px-3 py-1.5 rounded border text-xs font-bold flex items-center gap-1 transition-colors disabled:opacity-50 ${mode === 'video' ? 'bg-cyan-900/20 text-cyan-400 border-cyan-500/20' : 'bg-purple-900/20 text-purple-400 border-purple-500/20'}`}>
-                  {loadingIdx === idx ? <><i className="fa-solid fa-sync animate-spin" /> Đang tạo...</> : <><i className="fa-solid fa-magic" /> Tạo {mode === 'video' ? 'Video' : 'Ảnh'}</>}
+                <button 
+                  onClick={() => genMedia(idx)} 
+                  disabled={isGenerating}
+                  className={`px-3 py-1.5 rounded border text-xs font-bold flex items-center gap-1 transition-colors disabled:opacity-50 ${mode === 'video' ? 'bg-cyan-900/20 text-cyan-400 border-cyan-500/20' : 'bg-purple-900/20 text-purple-400 border-purple-500/20'}`}
+                >
+                  {isGenerating ? (
+                    <><i className="fa-solid fa-sync animate-spin" /> Đang vẽ...</>
+                  ) : (
+                    <><i className="fa-solid fa-magic" /> Vẽ {mode === 'video' ? 'Video' : 'Ảnh'}</>
+                  )}
                 </button>
               </div>
-              <div className={`w-full sm:w-64 bg-black rounded border border-white/10 overflow-hidden shrink-0 flex items-center justify-center ${mode === 'video' ? 'aspect-video' : 'aspect-square'}`}>
+              <div className={`w-full sm:w-64 bg-black rounded border border-white/10 overflow-hidden shrink-0 flex items-center justify-center relative group ${mode === 'video' ? 'aspect-video' : 'aspect-square'}`}>
                 {result ? (
                   <div className="relative group w-full h-full">
                     <img src={result} className="w-full h-full object-cover" />
@@ -120,7 +182,17 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center p-4"><i className={`fa-solid ${mode === 'video' ? 'fa-film' : 'fa-image'} text-2xl mb-2 opacity-50`} /><div className="text-[10px] text-slate-500">Chưa có dữ liệu</div></div>
+                  <div className="text-center p-4">
+                    <i className={`fa-solid ${mode === 'video' ? 'fa-film' : 'fa-image'} text-2xl mb-2 opacity-50`} />
+                    <div className="text-[10px] text-slate-500">Chưa có dữ liệu</div>
+                  </div>
+                )}
+                
+                {isGenerating && (
+                  <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center space-y-2">
+                    <i className="fa-solid fa-circle-notch text-amber-400 animate-spin text-2xl" />
+                    <p className="text-[10px] text-amber-200 animate-pulse font-medium">Đang phác họa cảnh thiền...</p>
+                  </div>
                 )}
               </div>
             </div>
