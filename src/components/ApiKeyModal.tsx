@@ -297,6 +297,9 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {canClose ? 'LƯU CẤU HÌNH & TIẾP TỤC' : 'NHẬP API KEY ĐỂ TIẾP TỤC'}
           </button>
           <p className="text-[10px] text-slate-600 mt-2 text-center">🔒 Keys lưu an toàn trong trình duyệt của bạn, không gửi về server</p>
+          <p className="text-[11px] text-amber-400/80 mt-2 text-center bg-amber-950/20 p-2 rounded-lg border border-amber-500/10">
+            ⚠️ Key chỉ lưu trên trình duyệt này (localStorage). Không gửi lên server. Xóa dữ liệu trình duyệt = mất key. Đừng sử dụng máy công cộng.
+          </p>
         </div>
       </div>
     </div>

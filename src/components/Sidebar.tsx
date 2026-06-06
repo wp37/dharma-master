@@ -39,9 +39,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, hasScriptData
   return (
     <div className="w-full md:w-64 flex md:flex-col gap-2 shrink-0 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
       {CONTENT_TABS.map(renderTab)}
-      {/* Admin separator */}
-      <div className="hidden md:block border-t border-white/5 my-1"></div>
-      {renderTab('admin')}
     </div>
   );
 };

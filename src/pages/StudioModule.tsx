@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { generateImage } from '../services/aiService';
 import { showToast } from '../components/Toast';
+import { arr } from '../services/safe';
+import { safeCallAI } from '../services/safeCall';
 
 interface Props { segments: any[]; }
 
@@ -17,16 +19,16 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
 
   // localStorage fallback — read saved script if no prop data
   const segments = React.useMemo(() => {
-    if (propSegments.length > 0) return propSegments;
+    if (arr(propSegments).length > 0) return arr(propSegments);
     try {
       const saved = localStorage.getItem('dharma_last_script');
-      return saved ? JSON.parse(saved) : [];
+      return arr(saved ? JSON.parse(saved) : []);
     } catch { return []; }
   }, [propSegments]);
 
   const initialMode = React.useMemo(() => {
-    const hasVideo = segments.some(s => s.video_prompt && s.video_prompt.trim() !== '');
-    const hasImage = segments.some(s => s.image_prompt && s.image_prompt.trim() !== '');
+    const hasVideo = arr(segments).some(s => s.video_prompt && s.video_prompt.trim() !== '');
+    const hasImage = arr(segments).some(s => s.image_prompt && s.image_prompt.trim() !== '');
     if (!hasVideo && hasImage) return 'image';
     return 'video';
   }, [segments]);
@@ -34,8 +36,8 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
   const [mode, setMode] = useState<'video' | 'image'>(initialMode);
 
   React.useEffect(() => {
-    const hasVideo = segments.some(s => s.video_prompt && s.video_prompt.trim() !== '');
-    const hasImage = segments.some(s => s.image_prompt && s.image_prompt.trim() !== '');
+    const hasVideo = arr(segments).some(s => s.video_prompt && s.video_prompt.trim() !== '');
+    const hasImage = arr(segments).some(s => s.image_prompt && s.image_prompt.trim() !== '');
     if (!hasVideo && hasImage) {
       setMode('image');
     } else {
@@ -58,14 +60,15 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
         return;
       }
       prompt += mode === 'video' ? ', 8k, cinematic lighting --no text' : ', masterpiece, 8k';
-      const result = await generateImage(prompt, mode === 'video' ? '16:9' : '1:1');
+      
+      const result = await safeCallAI(() => generateImage(prompt, mode === 'video' ? '16:9' : '1:1'));
       if (result) {
         setMedia(prev => ({ ...prev, [key]: result }));
       } else {
-        if (!isParallelCall) showToast('Lỗi Safety/API. Thử prompt khác.');
+        if (!isParallelCall) showToast('Không vẽ được ảnh từ Google API.', 'error');
       }
     } catch (e: any) {
-      if (!isParallelCall) showToast(e.message);
+      if (!isParallelCall) showToast(e.message || 'Lỗi sinh ảnh', 'error');
     } finally {
       setGeneratingMap(prev => ({ ...prev, [key]: false }));
     }
@@ -76,15 +79,15 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
     if (activeGenerating) return;
     
     showToast('🚀 Bắt đầu vẽ song song tất cả các phân cảnh kịch bản...', 'success');
-    const promises = segments.map((_, idx) => genMedia(idx, true));
+    const promises = arr(segments).map((_, idx) => genMedia(idx, true));
     await Promise.all(promises);
     showToast('✨ Hoàn thành vẽ toàn bộ phân cảnh song song!', 'success');
   };
 
   const exportCSV = () => {
-    if (!segments.length) return;
+    if (!arr(segments).length) return;
     let csv = '\uFEFFCảnh,Thời Gian,Phần,Lời Thoại,Video Prompt,Image Prompt\n';
-    segments.forEach((s, i) => {
+    arr(segments).forEach((s, i) => {
       csv += `${i + 1},"${s.time}","${s.section}","${(s.voice_text || '').replace(/"/g, '""')}","${(s.video_prompt || '').replace(/"/g, '""')}","${(s.image_prompt || '').replace(/"/g, '""')}"\n`;
     });
     downloadFile(csv, `dharma_kich_ban_${Date.now()}.csv`, 'text/csv;charset=utf-8;');
@@ -92,19 +95,19 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
   };
 
   const exportPrompts = (type: 'video' | 'image', format: 'csv' | 'txt') => {
-    if (!segments.length) return;
+    if (!arr(segments).length) return;
     if (format === 'csv') {
       let csv = `\uFEFFCảnh,${type} Prompt\n`;
-      segments.forEach((s, i) => { csv += `${i + 1},"${((type === 'video' ? s.video_prompt : s.image_prompt) || '').replace(/"/g, '""')}"\n`; });
+      arr(segments).forEach((s, i) => { csv += `${i + 1},"${((type === 'video' ? s.video_prompt : s.image_prompt) || '').replace(/"/g, '""')}"\n`; });
       downloadFile(csv, `prompts_${type}_${Date.now()}.csv`, 'text/csv;charset=utf-8;');
     } else {
-      const content = segments.map(s => (type === 'video' ? s.video_prompt : s.image_prompt) || '').filter(Boolean).join('\n\n');
+      const content = arr(segments).map(s => (type === 'video' ? s.video_prompt : s.image_prompt) || '').filter(Boolean).join('\n\n');
       downloadFile(content, `prompts_${type}_${Date.now()}.txt`, 'text/plain;charset=utf-8;');
     }
     setShowExport(false);
   };
 
-  if (!segments.length) return (
+  if (!arr(segments).length) return (
     <div className="h-full flex flex-col items-center justify-center animate-[slideIn_0.4s_ease-out]">
       <div className="text-center text-slate-500 py-10 italic">Chưa có dữ liệu kịch bản.<br/>Hãy tạo kịch bản ở tab <strong>"Pháp Thoại"</strong> trước.</div>
     </div>
@@ -147,7 +150,7 @@ const StudioModule: React.FC<Props> = ({ segments: propSegments }) => {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto space-y-4 pb-10">
-        {segments.map((seg, idx) => {
+        {arr(segments).map((seg: any, idx: number) => {
           const prompt = mode === 'video' ? seg.video_prompt : seg.image_prompt;
           const result = media[`${idx}_${mode}`];
           const isGenerating = generatingMap[`${idx}_${mode}`];

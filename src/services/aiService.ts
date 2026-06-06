@@ -90,30 +90,54 @@ export function hasAnyApiKey(): boolean {
 function getNextKey(): string {
   const validKeys = config.keyPool.filter(k => k && k.trim() !== '');
   if (validKeys.length === 0) return '';
+  const key = validKeys[config.currentKeyIndex % validKeys.length];
   config.currentKeyIndex = (config.currentKeyIndex + 1) % validKeys.length;
-  return validKeys[config.currentKeyIndex];
+  return key;
 }
 
 // === JSON Parser ===
 function safeJSONParse(str: string): any {
   if (!str) return null;
+  
+  // Strip markdown fences
   let clean = str.replace(/```json/gi, '').replace(/```/g, '').trim();
+  
+  // Find JSON block
   const firstBrace = clean.indexOf('{');
   const firstBracket = clean.indexOf('[');
   let start = -1, end = -1;
+  
   if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
     start = firstBrace; end = clean.lastIndexOf('}');
   } else if (firstBracket !== -1) {
     start = firstBracket; end = clean.lastIndexOf(']');
   }
-  if (start !== -1 && end !== -1) clean = clean.substring(start, end + 1);
-  else throw new Error("Invalid JSON structure");
-
-  try { return JSON.parse(clean); }
-  catch {
-    if (clean.startsWith('{')) return JSON.parse(clean + '}');
-    if (clean.startsWith('[')) return JSON.parse(clean + ']');
-    throw new Error("JSON Parse Error");
+  
+  if (start === -1) throw new Error("No JSON found in response");
+  if (end === -1) end = clean.length - 1;
+  clean = clean.substring(start, end + 1);
+  
+  try {
+    return JSON.parse(clean);
+  } catch (e) {
+    // Try to auto-close missing braces/brackets
+    let depth = 0, bracketDepth = 0;
+    let inString = false, escape = false;
+    for (const ch of clean) {
+      if (escape) { escape = false; continue; }
+      if (ch === '\\') { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      else if (ch === '[') bracketDepth++;
+      else if (ch === ']') bracketDepth--;
+    }
+    let repaired = clean;
+    while (bracketDepth-- > 0) repaired += ']';
+    while (depth-- > 0) repaired += '}';
+    try { return JSON.parse(repaired); }
+    catch { throw new Error(`JSON Parse Error: ${(e as Error).message}`); }
   }
 }
 
@@ -124,13 +148,20 @@ async function callGoogleWithRetry(prompt: string, systemPrompt: string, retries
     const apiKey = getNextKey();
     if (!apiKey) continue;
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.text}:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.text}:generateContent`;
       const body = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: { responseMimeType: "application/json" },
       };
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(body)
+      });
       if (res.status === 429) throw new Error("429 Quota Exceeded");
       if (!res.ok) {
         const errText = await res.text();
@@ -261,10 +292,26 @@ export async function callAI(prompt: string, systemPrompt: string): Promise<any>
   throw new Error("❌ Tất cả các API được bật đều thất bại hoặc thiếu API key hợp lệ!");
 }
 
+function extractYoutubeId(url: string): string | null {
+  if (!url) return null;
+  // /shorts/ID
+  let m = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtu.be/ID
+  m = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // ?v=ID or &v=ID  
+  m = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // /embed/ID or /v/ID
+  m = url.match(/youtube\.com\/(?:embed|v|e)\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  return null;
+}
+
 // === YouTube Meta Fetcher ===
 export async function fetchYoutubeMeta(url: string): Promise<any> {
-  const videoIdMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  const videoId = videoIdMatch ? videoIdMatch[1] : null;
+  const videoId = extractYoutubeId(url);
   if (!videoId) return { title: "Invalid URL", author: "Unknown", thumb: "" };
 
   // Try YouTube Data API first
@@ -284,7 +331,7 @@ export async function fetchYoutubeMeta(url: string): Promise<any> {
             tags: item.snippet.tags?.join(', ') || '',
             viewCount: item.statistics.viewCount,
             likeCount: item.statistics.likeCount,
-            publishDate: item.snippet.publishedAt,
+            publishDate: item.statistics.publishedAt,
             fullData: true,
           };
         }
@@ -308,9 +355,16 @@ export async function generateImage(prompt: string, aspectRatio: string = "16:9"
   const apiKey = getNextKey();
   if (!apiKey) throw new Error("Nhập API Key!");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.image}:predict?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.image}:predict`;
   const body = { instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio } };
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify(body)
+  });
   const data = await res.json();
 
   if (data.predictions?.[0]?.bytesBase64Encoded) {

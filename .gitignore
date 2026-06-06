@@ -37,3 +37,16 @@ dist-ssr
 *.txt
 upgradetool/
 
+# Local files
+huongdan.md
+PROJECT_BLUEPRINT.md
+UPGRADE_TEMPLATE.md
+*.local.md
+
+# OS
+Thumbs.db
+
+# IDE
+.cursor/
+.antigravity/
+

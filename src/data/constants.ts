@@ -224,14 +224,13 @@ export const SEO_CHECKLIST_DATA: Record<string, { id: string; label: string }[]>
 
 export const SECONDS_PER_SCENE = 8;
 
-export type TabId = 'spy' | 'script' | 'studio' | 'seo' | 'admin';
+export type TabId = 'spy' | 'script' | 'studio' | 'seo';
 
 export const TAB_COLORS: Record<TabId, { bg: string; border: string; text: string; shadow: string }> = {
   spy: { bg: 'bg-teal-950/40', border: 'border-teal-500/50', text: 'text-teal-300', shadow: 'shadow-[0_0_15px_rgba(13,148,136,0.15)]' },
   script: { bg: 'bg-amber-950/30', border: 'border-amber-500/50', text: 'text-amber-300', shadow: 'shadow-[0_0_15px_rgba(212,165,116,0.15)]' },
   studio: { bg: 'bg-violet-950/30', border: 'border-violet-500/50', text: 'text-violet-300', shadow: 'shadow-[0_0_15px_rgba(139,92,246,0.15)]' },
   seo: { bg: 'bg-orange-950/30', border: 'border-orange-500/50', text: 'text-orange-300', shadow: 'shadow-[0_0_15px_rgba(232,93,38,0.15)]' },
-  admin: { bg: 'bg-red-950/30', border: 'border-red-500/50', text: 'text-red-300', shadow: 'shadow-[0_0_15px_rgba(239,68,68,0.15)]' },
 };
 
 // ==================================================================================
@@ -242,7 +241,6 @@ export const TAB_NAMES: Record<TabId, { name: string; desc: string; icon: string
   script: { name: '2. PHÁP THOẠI',  desc: 'Viết Kịch Bản Giảng Pháp',   icon: 'fa-solid fa-dharmachakra' },
   studio: { name: '3. STUDIO',      desc: 'Prompt Video & Ảnh Reference', icon: 'fa-solid fa-place-of-worship' },
   seo:    { name: '4. SEO MASTER',   desc: 'Tối Ưu Nội Dung & Viral',    icon: 'fa-solid fa-magnifying-glass-chart' },
-  admin:  { name: '⚙️ ADMIN',       desc: 'Quản Lý License',             icon: 'fa-solid fa-shield-halved' },
 };
 
 // ==================================================================================

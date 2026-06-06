@@ -3,6 +3,9 @@ import { callAI } from '../services/aiService';
 import { SYSTEM_PROMPT_SCRIPT_WRITER, STYLE_RECOMMENDATION_PROMPT } from '../data/prompts';
 import { BUDDHISM_CONTEXTS, VISUAL_STYLES, SECONDS_PER_SCENE, MODE_OPTIONS, VOICE_STYLES } from '../data/constants';
 import { showToast } from '../components/Toast';
+import { buildScriptPrompt, buildStyleRecommendPrompt } from '../services/promptBuilder';
+import { arr } from '../services/safe';
+import { safeCallAI } from '../services/safeCall';
 
 interface Props { onScriptGenerated: (segments: any[], style: string) => void; initialTopic?: string; }
 
@@ -67,10 +70,18 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
   // AI Style Recommendation
   const handleStyleRecommend = async () => {
     if (!topic) return showToast('Nhập chủ đề trước khi đề xuất style!');
-    setIsRecommending(true);
-    try {
-      const prompt = `CHỦ ĐỀ: "${topic}"\nTHỜI LƯỢNG: ${duration} phút\nCHẾ ĐỘ: ${activeMode.name}\nĐỀ XUẤT PHONG CÁCH PHÙ HỢP.`;
-      const rec = await callAI(prompt, STYLE_RECOMMENDATION_PROMPT);
+    const mk = BUDDHISM_CONTEXTS[market] || BUDDHISM_CONTEXTS['vn_mahayana'];
+    
+    const prompt = buildStyleRecommendPrompt({
+      topic,
+      duration,
+      mode: activeMode.name,
+      market,
+      buddhismContext: mk
+    });
+    
+    const rec = await safeCallAI(() => callAI(prompt, STYLE_RECOMMENDATION_PROMPT), setIsRecommending);
+    if (rec) {
       setStyleRec(rec);
       if (rec.primary_style) {
         setStyle(rec.primary_style);
@@ -80,8 +91,7 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
         setVoiceStyle(rec.primary_voice_style);
         showToast(`🎙️ AI đề xuất giọng: ${VOICE_STYLES.find(v => v.id === rec.primary_voice_style)?.name || rec.primary_voice_style}`, 'success');
       }
-    } catch (e: any) { showToast(e.message); }
-    finally { setIsRecommending(false); }
+    }
   };
 
   const handleGenerate = async () => {
@@ -89,91 +99,77 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
     if (genMode === 'competitor' && !competitorScript.trim()) {
       return showToast('Vui lòng nhập kịch bản của đối thủ!');
     }
-    setLoading(true);
+    
+    const styleObj = VISUAL_STYLES.find(s => s.id === style);
+    const voiceObj = VOICE_STYLES.find(v => v.id === voiceStyle);
+    const mk = BUDDHISM_CONTEXTS[market] || BUDDHISM_CONTEXTS['vn_mahayana'];
+    
+    let selectedHumanElement = mk.human_element;
+    if (narrativeLens === 'random') {
+      selectedHumanElement = 'Hãy tự động chọn ngẫu nhiên một chất liệu nhân văn/nhân vật độc đáo: có thể là câu chuyện bà ngoại chùa làng mộc mạc, người trẻ hiện đại vượt qua áp lực đồng lứa và căng thẳng cuộc sống, vị thiền sư tu tập chốn thanh tịnh sâu lắng rừng trúc, tình cảm mẫu tử/gia đình thiêng liêng hiếu thảo, hoặc châm ngôn điển tích của các bậc hiền triết cổ đức xưa dạy truyền đời... Hãy biến hóa xoay tua linh hoạt để kịch bản không bị lặp lại.';
+    } else if (narrativeLens === 'grandma') {
+      selectedHumanElement = 'Câu chuyện chùa làng ấm áp, những lời dặn mộc mạc mang đầy trí tuệ nhân sinh của bà ngoại.';
+    } else if (narrativeLens === 'modern_worker') {
+      selectedHumanElement = 'Người tu tại gia, nhân viên văn phòng bận rộn đối mặt áp lực công sở, cơm áo gạo tiền và cách tìm bình an chánh niệm giữa đời thường.';
+    } else if (narrativeLens === 'zen_master') {
+      selectedHumanElement = 'Vị thiền sư tu tập chốn thanh tịnh, rừng trúc, tiếng chuông chùa xa xăm, các cuộc đối thoại khai ngộ sâu sắc.';
+    } else if (narrativeLens === 'youth') {
+      selectedHumanElement = 'Người trẻ hiện đại đối mặt với áp lực đồng lứa (peer pressure), hoang mang tương lai và cách tìm lại điểm tựa tinh thần từ chánh niệm.';
+    } else if (narrativeLens === 'family') {
+      selectedHumanElement = 'Tình cảm gia đình, lòng biết ơn cha mẹ, sự hiếu thuận và cách chuyển hóa nỗi đau thế hệ bằng tình thương chánh niệm.';
+    } else if (narrativeLens === 'ancient_wisdom') {
+      selectedHumanElement = 'Bậc cổ đức truyền thừa, điển tích cổ nhân xưa dạy truyền đời đầy uy nghiêm và triết lý sâu sắc.';
+    }
+    
+    const scenesToUse = voiceOnly 
+      ? Math.min(10, Math.max(3, Math.ceil(duration / 2))) // 3-10 chapters
+      : scenes;
+
+    const prompt = buildScriptPrompt({
+      topic,
+      contentContext,
+      duration,
+      market,
+      mode: selectedMode,
+      voiceStyle,
+      visualStyle: style,
+      narrativeLens,
+      numberOfScenes: scenesToUse,
+      competitorScript: genMode === 'competitor' ? competitorScript : undefined,
+      buddhismContext: mk
+    });
+    
+    const json = await safeCallAI(() => callAI(prompt, SYSTEM_PROMPT_SCRIPT_WRITER), setLoading);
+    if (!json) return;
+    
+    let segs = json.script || (Array.isArray(json) ? json : []);
+    
+    let enforce = '';
+    const shouldApplyStyle = !voiceOnly || (voiceOnly && duration >= 10);
+    if (styleObj && styleObj.id !== 'auto' && shouldApplyStyle) enforce = styleObj.prompt_enforce;
+    else if (json.suggested_style && shouldApplyStyle) enforce = `, Visual Style: ${json.suggested_style}`;
+    
+    if (enforce && shouldApplyStyle) {
+      segs = arr(segs).map((s: any) => ({
+        ...s,
+        video_prompt: s.video_prompt && !s.video_prompt.includes('Visual Style:') ? `${s.video_prompt} ${enforce}` : (s.video_prompt || ''),
+        image_prompt: s.image_prompt && !s.image_prompt.includes('Visual Style:') ? `${s.image_prompt} ${enforce}` : (s.image_prompt || ''),
+      }));
+    }
+    setSegments(segs);
+    onScriptGenerated(segs, (voiceOnly && duration < 10) ? '' : (json.suggested_style || ''));
+
+    // localStorage sharing — Studio & SEO tabs can read this
     try {
-      const styleObj = VISUAL_STYLES.find(s => s.id === style);
-      const voiceObj = VOICE_STYLES.find(v => v.id === voiceStyle);
-      const mk = BUDDHISM_CONTEXTS[market] || BUDDHISM_CONTEXTS['vn_mahayana'];
-      
-      let selectedHumanElement = mk.human_element;
-      if (narrativeLens === 'random') {
-        selectedHumanElement = 'Hãy tự động chọn ngẫu nhiên một chất liệu nhân văn/nhân vật độc đáo: có thể là câu chuyện bà ngoại chùa làng mộc mạc, người trẻ hiện đại vượt qua áp lực đồng lứa và căng thẳng cuộc sống, vị thiền sư tu tập chốn thanh tịnh sâu lắng rừng trúc, tình cảm mẫu tử/gia đình thiêng liêng hiếu thảo, hoặc châm ngôn điển tích của các bậc hiền triết cổ đức xưa dạy truyền đời... Hãy biến hóa xoay tua linh hoạt để kịch bản không bị lặp lại.';
-      } else if (narrativeLens === 'grandma') {
-        selectedHumanElement = 'Câu chuyện chùa làng ấm áp, những lời dặn mộc mạc mang đầy trí tuệ nhân sinh của bà ngoại.';
-      } else if (narrativeLens === 'modern_worker') {
-        selectedHumanElement = 'Người tu tại gia, nhân viên văn phòng bận rộn đối mặt áp lực công sở, cơm áo gạo tiền và cách tìm bình an chánh niệm giữa đời thường.';
-      } else if (narrativeLens === 'zen_master') {
-        selectedHumanElement = 'Vị thiền sư tu tập chốn thanh tịnh, rừng trúc, tiếng chuông chùa xa xăm, các cuộc đối thoại khai ngộ sâu sắc.';
-      } else if (narrativeLens === 'youth') {
-        selectedHumanElement = 'Người trẻ hiện đại đối mặt với áp lực đồng lứa (peer pressure), hoang mang tương lai và cách tìm lại điểm tựa tinh thần từ chánh niệm.';
-      } else if (narrativeLens === 'family') {
-        selectedHumanElement = 'Tình cảm gia đình, lòng biết ơn cha mẹ, sự hiếu thuận và cách chuyển hóa nỗi đau thế hệ bằng tình thương chánh niệm.';
-      } else if (narrativeLens === 'ancient_wisdom') {
-        selectedHumanElement = 'Bậc cổ đức truyền thừa, điển tích cổ nhân xưa dạy truyền đời đầy uy nghiêm và triết lý sâu sắc.';
-      }
-      
-      const modeInstruction = genMode === 'creative' 
-        ? `GENERATION_MODE: SÁNG TẠO (CREATIVE). Hãy tự do sáng tạo kịch bản nguyên bản, mới lạ, sâu sắc và đầy cảm xúc dựa trên chủ đề Phật pháp.` 
-        : `GENERATION_MODE: BÁM SÁT KỊCH BẢN ĐỐI THỦ (FOLLOW COMPETITOR). Hãy phân tích chặt chẽ cấu trúc phân đoạn, thời lượng, mạch logic, cách đặt câu hỏi hook đầu video, các mốc chuyển cảnh và cách phân bổ thời lượng của kịch bản gốc của đối thủ dưới đây:\n\n--- KỊCH BẢN ĐỐI THỦ ---\n${competitorScript}\n---------------------\n\nHãy mô phỏng chính xác cấu trúc và nhịp điệu trên, nhưng viết lại nội dung mới mẻ, mang chiều sâu triết lý Phật pháp cao nhất dựa trên chủ đề Phật pháp mới.`;
-
-      const contextBlock = contentContext.trim() ? `\nCONTENT_CONTEXT (Nội dung/bối cảnh người dùng cung cấp — hãy dựa vào đây làm nguồn tư liệu chính để viết kịch bản, giữ đúng tinh thần và ý nghĩa của nội dung gốc):\n---\n${contentContext.trim()}\n---` : '';
-      
-      const scenesToUse = voiceOnly 
-        ? Math.min(10, Math.max(3, Math.ceil(duration / 2))) // 3-10 chapters
-        : scenes;
-
-      let voiceOnlyInstruction = '';
-      if (voiceOnly) {
-        if (duration >= 10) {
-          voiceOnlyInstruction = `\n[CRITICAL - LONG DHARMA TALK MODE (IMAGE ONLY, NO VIDEO)]:
-- The user has requested a long script of ${duration} minutes.
-- DO NOT generate video prompts. The "video_prompt" field MUST be an empty string ("").
-- BUT YOU MUST generate detailed Vietnamese visual descriptions ("visual_desc_vi") and high-quality English image prompts ("image_prompt") suitable for Google Imagen 3/Midjourney for each chapter.
-- Do not create a high number of short scenes. Instead, divide the entire ${duration}-minute talk into exactly ${scenesToUse} major chapters/sections (e.g., HOOK/INTRODUCTION, CHAPTER 1, CHAPTER 2, ..., CONCLUSION).
-- MỖI PHẦN (EACH SECTION) PHẢI VIẾT CỰC KỲ DÀI, CHI TIẾT VÀ SÂU SẮC, tối thiểu từ 400 - 500 từ tiếng Việt mỗi phần. Không viết tóm tắt hay lược bớt ý. Hãy viết đầy đủ lời thuyết giảng tường tận để đảm bảo tổng số từ của toàn bộ bài viết đạt ít nhất ${words} từ (đáp ứng đúng độ dài bài pháp thoại thực tế ${duration} phút).
-- Focus your creative writing quality and tokens on the "voice_text" content to deliver an inspiring, professional, and deeply moving Dharma talk, accompanied by beautiful symbolic Imagen 3 image prompts.`;
-        } else {
-          voiceOnlyInstruction = `\n[CRITICAL - VOICE ONLY MODE]:
-- The user has requested a VOICE-ONLY script of ${duration} minutes.
-- DO NOT generate visual descriptions, video prompts, or image prompts. Set "visual_desc_vi", "video_prompt", and "image_prompt" fields to empty string ("").
-- Do not create a high number of short scenes. Instead, divide the entire ${duration}-minute talk into exactly ${scenesToUse} major chapters/sections (e.g., HOOK/INTRODUCTION, CHAPTER 1, CHAPTER 2, ..., CONCLUSION).
-- MỖI PHẦN (EACH SECTION) PHẢI VIẾT CỰC KỲ DÀI, CHI TIẾT VÀ SÂU SẮC, tối thiểu từ 400 - 500 từ tiếng Việt mỗi phần. Không viết tóm tắt hay lược bớt ý. Hãy viết đầy đủ lời thuyết giảng tường tận, giải thích cặn kẽ từng giáo lý Phật Pháp để đảm bảo tổng số từ của toàn bộ bài viết đạt ít nhất ${words} từ (đáp ứng đúng độ dài bài pháp thoại thực tế ${duration} phút với tốc độ đọc trung bình 200 từ/phút).
-- Focus 100% of your creative writing quality and tokens on the "voice_text" content to deliver an inspiring, professional, and deeply moving Dharma talk.`;
-        }
-      }
-
-      const prompt = `TOPIC: "${topic}"\nDURATION: ${duration}m\nSCENE_COUNT: ${scenesToUse}\nTARGET_LANGUAGE: ${mk.voice_lang}\nTARGET_MARKET: ${mk.name}\nTRADITION: ${mk.tradition}\nKEY_PRACTICES: ${mk.key_practices}\nPHILOSOPHY: ${mk.philosophy}\nWRITING_STYLE: ${mk.writing_style}\nHUMAN_ELEMENT: ${selectedHumanElement}\nCULTURE: ${mk.culture}\nVISUAL_STYLE: ${(voiceOnly && duration < 10) ? 'None (Voice Only)' : (styleObj?.name || 'Auto')}\nVOICE_STYLE: ${voiceObj?.name || 'Default'}\nVOICE_STYLE_PROMPT_MODIFIER: ${voiceObj?.prompt_modifier || ''}\n${modeInstruction}${contextBlock}${voiceOnlyInstruction}\nGENERATE JSON OBJECT.`;
-      const json = await callAI(prompt, SYSTEM_PROMPT_SCRIPT_WRITER);
-      let segs = json.script || (Array.isArray(json) ? json : []);
-      
-      let enforce = '';
-      const shouldApplyStyle = !voiceOnly || (voiceOnly && duration >= 10);
-      if (styleObj && styleObj.id !== 'auto' && shouldApplyStyle) enforce = styleObj.prompt_enforce;
-      else if (json.suggested_style && shouldApplyStyle) enforce = `, Visual Style: ${json.suggested_style}`;
-      
-      if (enforce && shouldApplyStyle) {
-        segs = segs.map((s: any) => ({
-          ...s,
-          video_prompt: s.video_prompt && !s.video_prompt.includes('Visual Style:') ? `${s.video_prompt} ${enforce}` : (s.video_prompt || ''),
-          image_prompt: s.image_prompt && !s.image_prompt.includes('Visual Style:') ? `${s.image_prompt} ${enforce}` : (s.image_prompt || ''),
-        }));
-      }
-      setSegments(segs);
-      onScriptGenerated(segs, (voiceOnly && duration < 10) ? '' : (json.suggested_style || ''));
-
-      // localStorage sharing — Studio & SEO tabs can read this
-      try {
-        localStorage.setItem('dharma_last_script', JSON.stringify(segs));
-        localStorage.setItem('dharma_last_topic', topic);
-        localStorage.setItem('dharma_last_style', style);
-        localStorage.setItem('dharma_last_voice_style', voiceStyle);
-      } catch { /* quota exceeded — ignore */ }
-    } catch (e: any) { showToast(e.message); }
-    finally { setLoading(false); }
+      localStorage.setItem('dharma_last_script', JSON.stringify(segs));
+      localStorage.setItem('dharma_last_topic', topic);
+      localStorage.setItem('dharma_last_style', style);
+      localStorage.setItem('dharma_last_voice_style', voiceStyle);
+    } catch { /* quota exceeded — ignore */ }
   };
 
   const copyAll = () => {
-    const text = segments.map(s => s.chapter_voice_block || s.voice_text).join('\n\n');
+    const text = arr(segments).map(s => s.chapter_voice_block || s.voice_text).join('\n\n');
     navigator.clipboard.writeText(text);
     showToast('✅ Đã copy voice toàn bộ!', 'success');
   };
@@ -455,13 +451,13 @@ const ScriptModule: React.FC<Props> = ({ onScriptGenerated, initialTopic = '' })
           </button>
         </div>
       </div>
-      {segments.length > 0 && (
+      {arr(segments).length > 0 && (
         <div className="space-y-4 pb-10">
           <div className="flex justify-between items-center px-2">
-            <div className="text-xs text-slate-500 font-bold">Đã tạo: {segments.length} phân đoạn</div>
+            <div className="text-xs text-slate-500 font-bold">Đã tạo: {arr(segments).length} phân đoạn</div>
             <button onClick={copyAll} className="text-xs font-bold px-3 py-1.5 rounded flex items-center gap-2 bg-white text-black hover:bg-slate-200"><i className="fa-solid fa-copy" /> Copy Lời Thoại</button>
           </div>
-          {segments.map((seg, idx) => {
+          {arr(segments).map((seg, idx) => {
             const isVoiceOnlySeg = !seg.visual_desc_vi && !seg.visual_desc && !seg.video_prompt;
             return (
               <div key={idx} className="cosmic-card p-4 rounded-xl flex flex-col sm:flex-row gap-4 hover:!border-teal-500/20 transition-colors relative">

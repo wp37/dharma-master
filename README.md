@@ -1,73 +1,24 @@
-# React + TypeScript + Vite
+# 🪷 TUAI Dharma Master
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Bộ công cụ AI sáng tạo nội dung Phật giáo YouTube/TikTok cho bản thân — không phải sản phẩm thương mại.
 
-Currently, two official plugins are available:
+## Tính năng
+- **Spy**: Phân tích video Phật pháp đối thủ, soi cờ đỏ giáo lý, khai thác 10 ý tưởng nội dung độc đáo.
+- **Script**: Viết kịch bản theo truyền thống (Mahayana / Theravada / Thiền / Mật tông).
+- **Studio**: Sinh ảnh thumbnail/scene với Imagen 3.
+- **SEO**: Gói SEO 6 phần cho YouTube + TikTok.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Công nghệ sử dụng
+React 19 · TypeScript · Vite · Tailwind · Gemini API (Imagen 3.0 / Gemini 2.0)
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Chạy local
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Deploy
+Push lên main → Vercel auto deploy.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Cấu hình API
+Mở app → bấm icon ⚙️ → dán API key. Key chỉ lưu trên trình duyệt của bạn (localStorage).

@@ -3,10 +3,13 @@ import { callAI } from '../services/aiService';
 import { SYSTEM_PROMPT_SEO_MASTER } from '../data/prompts';
 import { BUDDHISM_CONTEXTS, SEO_CHECKLIST_DATA } from '../data/constants';
 import { showToast } from '../components/Toast';
+import { buildSeoPrompt } from '../services/promptBuilder';
+import { arr } from '../services/safe';
+import { safeCallAI } from '../services/safeCall';
 
 interface Props { initialTopic?: string; }
 
-type Platform = 'YouTube Shorts' | 'TikTok';
+type Platform = 'YouTube Shorts' | 'TikTok' | 'YouTube Long-form' | 'Facebook Reels' | 'Instagram Reels';
 
 const HOOK_ICONS: Record<string, string> = {
   Curiosity: '🔍', Emotion: '💛', Value: '📊', Question: '❓', Authority: '📿',
@@ -51,19 +54,22 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
 
   const handleGenerate = async () => {
     if (!topic) return showToast('Nhập chủ đề SEO!');
-    setLoading(true);
-    try {
-      const mk = BUDDHISM_CONTEXTS[market] || BUDDHISM_CONTEXTS['vn_mahayana'];
-      try { localStorage.setItem('dharma_last_market', market); } catch { /* ignore */ }
-      const prompt = `TOPIC: "${topic}"\nPLATFORM: ${platform}\nTARGET_LANGUAGE: ${mk.voice_lang}\nTARGET_MARKET: ${mk.name}\nTRADITION: ${mk.tradition}\nCULTURE: ${mk.culture}\nNICHE: Buddhist/Dharma/Meditation\nGENERATE JSON. RESPOND IN VIETNAMESE WHERE APPLICABLE.`;
-      setResult(await callAI(prompt, SYSTEM_PROMPT_SEO_MASTER));
-    } catch (e: any) { showToast(e.message); }
-    finally { setLoading(false); }
+    const mk = BUDDHISM_CONTEXTS[market] || BUDDHISM_CONTEXTS['vn_mahayana'];
+    try { localStorage.setItem('dharma_last_market', market); } catch { /* ignore */ }
+
+    const prompt = buildSeoPrompt({
+      topic,
+      platform,
+      buddhismContext: mk,
+    });
+
+    const res = await safeCallAI(() => callAI(prompt, SYSTEM_PROMPT_SEO_MASTER), setLoading);
+    if (res) setResult(res);
   };
 
   // ─── Render helpers ────────────────────────────────────
   const renderTitleOptions = () => {
-    if (!Array.isArray(result?.title_options) || result.title_options.length === 0) return null;
+    if (!result?.title_options || arr(result.title_options).length === 0) return null;
     return (
       <div className="bg-amber-900/10 border border-amber-500/20 rounded-xl p-4 animate-fade-in">
         <h4 className="text-xs font-bold text-amber-400 mb-3 uppercase flex items-center gap-2">
@@ -82,7 +88,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
               </tr>
             </thead>
             <tbody>
-              {result.title_options.map((opt: any, i: number) => (
+              {arr(result.title_options).map((opt: any, i: number) => (
                 <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                   <td className="py-2 pr-2 text-slate-500 font-mono">{i + 1}</td>
                   <td className="py-2 pr-2 text-white font-medium max-w-[300px]">{opt.title}</td>
@@ -133,9 +139,9 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
   };
 
   const renderTags30 = () => {
-    if (!Array.isArray(result?.tags_30) || result.tags_30.length === 0) return null;
+    if (!result?.tags_30 || arr(result.tags_30).length === 0) return null;
     const grouped: Record<string, any[]> = { 'Chính': [], 'Phụ': [], 'Long-tail': [] };
-    result.tags_30.forEach((t: any) => {
+    arr(result.tags_30).forEach((t: any) => {
       const p = t.priority || 'Long-tail';
       if (!grouped[p]) grouped[p] = [];
       grouped[p].push(t);
@@ -143,7 +149,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
     return (
       <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-4 animate-fade-in">
         <h4 className="text-xs font-bold text-blue-400 mb-3 uppercase flex items-center gap-2">
-          <i className="fa-solid fa-tags" /> 3. TAGS ({result.tags_30.length} TAGS)
+          <i className="fa-solid fa-tags" /> 3. TAGS ({arr(result.tags_30).length} TAGS)
         </h4>
         <div className="space-y-3">
           {Object.entries(grouped).map(([priority, tags]) => tags.length > 0 && (
@@ -166,7 +172,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
             </div>
           ))}
         </div>
-        <button onClick={() => copy(result.tags_30.map((t: any) => t.tag).join(', '))} className="mt-3 text-xs text-blue-400 hover:underline flex items-center gap-1">
+        <button onClick={() => copy(arr(result.tags_30).map((t: any) => t.tag).join(', '))} className="mt-3 text-xs text-blue-400 hover:underline flex items-center gap-1">
           <i className="fa-solid fa-copy" /> Copy Tất Cả Tags
         </button>
       </div>
@@ -182,7 +188,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
       { key: 'topic_specific', label: 'Topic', icon: '🎯', color: 'text-orange-300' },
       { key: 'branded', label: 'Brand', icon: '✨', color: 'text-amber-300' },
     ];
-    const allHashtags = [...(hs.broad || []), ...(hs.niche || []), ...(hs.topic_specific || []), ...(hs.branded || [])];
+    const allHashtags = [...arr(hs.broad), ...arr(hs.niche), ...arr(hs.topic_specific), ...arr(hs.branded)];
     return (
       <div className="bg-purple-900/10 border border-purple-500/20 rounded-xl p-4 animate-fade-in">
         <h4 className="text-xs font-bold text-purple-400 mb-3 uppercase flex items-center gap-2">
@@ -214,14 +220,14 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
   };
 
   const renderPostingSchedule = () => {
-    if (!Array.isArray(result?.posting_schedule) || result.posting_schedule.length === 0) return null;
+    if (!result?.posting_schedule || arr(result.posting_schedule).length === 0) return null;
     return (
       <div className="bg-cyan-900/10 border border-cyan-500/20 rounded-xl p-4 animate-fade-in">
         <h4 className="text-xs font-bold text-cyan-400 mb-3 uppercase flex items-center gap-2">
           <i className="fa-solid fa-clock" /> 5. THỜI ĐIỂM ĐĂNG TỐI ƯU
         </h4>
         <div className="space-y-2">
-          {result.posting_schedule.map((item: any, i: number) => (
+          {arr(result.posting_schedule).map((item: any, i: number) => (
             <div key={i} className="flex items-start gap-3 bg-[#060810] p-3 rounded-lg border border-white/5 hover:border-cyan-500/20 transition-colors">
               <div className="w-8 h-8 rounded-full bg-cyan-900/30 border border-cyan-500/20 flex items-center justify-center shrink-0">
                 <span className="text-sm">{i < 2 ? '🕐' : i === 2 ? '🌕' : '🎊'}</span>
@@ -238,7 +244,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
   };
 
   const renderSeasonalKeywords = () => {
-    if (!Array.isArray(result?.seasonal_keywords) || result.seasonal_keywords.length === 0) return null;
+    if (!result?.seasonal_keywords || arr(result.seasonal_keywords).length === 0) return null;
     const monthIcons: Record<string, string> = { '1-2': '🧧', '4': '🪷', '7': '🙏', '8': '🏮', '12': '🎄' };
     return (
       <div className="bg-rose-900/10 border border-rose-500/20 rounded-xl p-4 animate-fade-in">
@@ -255,7 +261,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
               </tr>
             </thead>
             <tbody>
-              {result.seasonal_keywords.map((s: any, i: number) => (
+              {arr(result.seasonal_keywords).map((s: any, i: number) => (
                 <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                   <td className="py-2.5 pr-2">
                     <span className="bg-rose-900/20 text-rose-300 px-2 py-0.5 rounded-full text-[10px] border border-rose-500/20 font-mono">
@@ -265,7 +271,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
                   <td className="py-2.5 pr-2 text-white font-medium">{s.event}</td>
                   <td className="py-2.5">
                     <div className="flex flex-wrap gap-1">
-                      {Array.isArray(s.keywords) && s.keywords.map((kw: string, j: number) => (
+                      {arr(s.keywords).map((kw: any, j: number) => (
                         <button key={j} onClick={() => copy(kw)} className="bg-rose-900/15 text-rose-200 px-2 py-0.5 rounded text-[10px] border border-rose-500/15 hover:bg-rose-900/30 transition-colors">
                           {kw}
                         </button>
@@ -291,7 +297,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
         {['primary', 'secondary', 'long_tail'].map(type => Array.isArray(result.keywords[type]) && (
           <div key={type} className="mb-2">
             <div className="text-[10px] text-slate-400 mb-1 font-bold">{type === 'primary' ? 'Từ khóa chính' : type === 'secondary' ? 'Từ khóa phụ' : 'Từ khóa dài'}</div>
-            <div className="flex flex-wrap gap-1">{result.keywords[type].map((k: string, i: number) => <span key={i} className="bg-blue-900/20 text-blue-200 px-2 py-0.5 rounded-full text-[10px] border border-blue-500/20">{k}</span>)}</div>
+            <div className="flex flex-wrap gap-1">{arr(result.keywords[type]).map((k: any, i: number) => <span key={i} className="bg-blue-900/20 text-blue-200 px-2 py-0.5 rounded-full text-[10px] border border-blue-500/20">{k}</span>)}</div>
           </div>
         ))}
       </div>
@@ -304,8 +310,8 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
     return (
       <div className="bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
         <h4 className="text-xs font-bold text-purple-400 mb-3 uppercase">#️⃣ HASHTAG</h4>
-        <div className="flex flex-wrap gap-2">{result.hashtags.map((h: string, i: number) => <button key={i} onClick={() => copy(h)} className="bg-purple-900/20 text-purple-300 px-3 py-1 rounded-lg text-sm border border-purple-500/20 hover:bg-purple-900/30">{h}</button>)}</div>
-        <button onClick={() => copy(result.hashtags.join(' '))} className="mt-2 text-xs text-purple-400 hover:underline flex items-center gap-1"><i className="fa-solid fa-copy" /> Copy Tất Cả</button>
+        <div className="flex flex-wrap gap-2">{arr(result.hashtags).map((h: any, i: number) => <button key={i} onClick={() => copy(h)} className="bg-purple-900/20 text-purple-300 px-3 py-1 rounded-lg text-sm border border-purple-500/20 hover:bg-purple-900/30">{h}</button>)}</div>
+        <button onClick={() => copy(arr(result.hashtags).join(' '))} className="mt-2 text-xs text-purple-400 hover:underline flex items-center gap-1"><i className="fa-solid fa-copy" /> Copy Tất Cả</button>
       </div>
     );
   };
@@ -316,7 +322,7 @@ const SeoModule: React.FC<Props> = ({ initialTopic = '' }) => {
     return (
       <div className="bg-[#0a0e1a] border border-white/5 rounded-xl p-4">
         <h4 className="text-xs font-bold text-amber-400 mb-3 uppercase">⚡ TIÊU ĐỀ VIRAL</h4>
-        <div className="space-y-2">{result.viral_titles.map((t: string, i: number) => (
+        <div className="space-y-2">{arr(result.viral_titles).map((t: any, i: number) => (
           <div key={i} className="flex justify-between items-center bg-[#060810] p-2 rounded border border-white/10">
             <span className="text-sm text-white font-medium flex-1">{i + 1}. {t}</span>
             <button onClick={() => copy(t)} className="text-slate-500 hover:text-white ml-2"><i className="fa-solid fa-copy" /></button>
