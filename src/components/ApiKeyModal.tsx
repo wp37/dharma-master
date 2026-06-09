@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { loadApiConfig, saveApiConfig } from '../services/aiService';
-import type { ApiConfig } from '../services/aiService';
+import type { ApiConfig, ApiTestResult } from '../services/aiService';
+import {
+  testGeminiKey,
+  testOpenRouterKey,
+  testOpenAIKey,
+  testYouTubeKey,
+} from '../services/aiService';
 
 interface Props { isOpen: boolean; onClose: () => void; }
 
 type TabId = 'gemini' | 'openrouter' | 'openai' | 'youtube';
 
+type TestStatus = 'idle' | 'loading' | 'ok' | 'error';
+interface KeyStatus { status: TestStatus; result?: ApiTestResult }
+
 const OPENROUTER_MODELS = [
-  { value: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (Free)' },
+  { value: 'google/gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Free)' },
   { value: 'google/gemini-flash-1.5', label: 'Gemini 1.5 Flash' },
   { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
   { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (Free)' },
@@ -22,31 +31,112 @@ const OPENAI_MODELS = [
   { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
 ];
 
+/* ── Helper badge ── */
+function StatusBadge({ ks }: { ks: KeyStatus }) {
+  if (ks.status === 'loading') return (
+    <span className="flex items-center gap-1 text-[10px] text-amber-300 font-bold animate-pulse">
+      <i className="fa-solid fa-circle-notch fa-spin text-[9px]" /> Đang test…
+    </span>
+  );
+  if (ks.status === 'ok') return (
+    <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
+      <i className="fa-solid fa-circle-check text-[10px]" />
+      OK {ks.result?.latencyMs != null && <span className="text-emerald-600">{ks.result.latencyMs}ms</span>}
+    </span>
+  );
+  if (ks.status === 'error') return (
+    <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold max-w-[180px] truncate" title={ks.result?.error}>
+      <i className="fa-solid fa-circle-xmark text-[10px]" /> {ks.result?.error || 'Lỗi'}
+    </span>
+  );
+  return null;
+}
+
+function TestButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      title="Kiểm tra key ngay"
+      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all select-none
+        ${loading
+          ? 'bg-slate-700/60 border-white/10 text-slate-500 cursor-not-allowed'
+          : 'bg-teal-900/20 border-teal-500/30 text-teal-300 hover:bg-teal-900/40 hover:border-teal-400/50 active:scale-95'
+        }`}
+    >
+      {loading
+        ? <><i className="fa-solid fa-circle-notch fa-spin" /> Test…</>
+        : <><i className="fa-solid fa-satellite-dish" /> Test</>
+      }
+    </button>
+  );
+}
+
+/* ── Main Component ── */
 const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<TabId>('gemini');
   const [cfg, setCfg] = useState<ApiConfig | null>(null);
   const [keys, setKeys] = useState<string[]>(['']);
 
+  // Test state
+  const [geminiStatuses, setGeminiStatuses] = useState<KeyStatus[]>([{ status: 'idle' }]);
+  const [orStatus, setOrStatus] = useState<KeyStatus>({ status: 'idle' });
+  const [oaiStatus, setOaiStatus] = useState<KeyStatus>({ status: 'idle' });
+  const [ytStatus, setYtStatus] = useState<KeyStatus>({ status: 'idle' });
+
   useEffect(() => {
     if (isOpen) {
       const loaded = loadApiConfig();
       setCfg(loaded);
-      setKeys(loaded.keyPool.length > 0 ? loaded.keyPool : ['']);
+      const ks = loaded.keyPool.length > 0 ? loaded.keyPool : [''];
+      setKeys(ks);
+      setGeminiStatuses(ks.map(() => ({ status: 'idle' as TestStatus })));
+      setOrStatus({ status: 'idle' });
+      setOaiStatus({ status: 'idle' });
+      setYtStatus({ status: 'idle' });
     }
   }, [isOpen]);
 
   if (!isOpen || !cfg) return null;
 
+  /* ── GEMINI ── */
   const updateGeminiKey = (i: number, v: string) => {
     const k = [...keys]; k[i] = v; setKeys(k);
     saveApiConfig({ keyPool: k });
+    const s = [...geminiStatuses]; s[i] = { status: 'idle' }; setGeminiStatuses(s);
   };
-  const addKey = () => setKeys([...keys, '']);
+  const addKey = () => {
+    setKeys([...keys, '']);
+    setGeminiStatuses([...geminiStatuses, { status: 'idle' }]);
+  };
   const removeKey = (i: number) => {
     const k = keys.filter((_, x) => x !== i);
     const next = k.length ? k : [''];
     setKeys(next);
     saveApiConfig({ keyPool: next });
+    const s = geminiStatuses.filter((_, x) => x !== i);
+    setGeminiStatuses(s.length ? s : [{ status: 'idle' }]);
+  };
+
+  const handleTestGemini = async (i: number) => {
+    const key = keys[i];
+    if (!key.trim()) return;
+    const s = [...geminiStatuses]; s[i] = { status: 'loading' }; setGeminiStatuses(s);
+    const result = await testGeminiKey(key);
+    const s2 = [...geminiStatuses]; s2[i] = { status: result.ok ? 'ok' : 'error', result }; setGeminiStatuses(s2);
+  };
+
+  const handleTestAllGemini = async () => {
+    const validIdxs = keys.map((k, i) => (k.trim().startsWith('AIza') ? i : -1)).filter(x => x >= 0);
+    if (validIdxs.length === 0) return;
+    const s = [...geminiStatuses];
+    validIdxs.forEach(i => { s[i] = { status: 'loading' }; });
+    setGeminiStatuses([...s]);
+    await Promise.all(validIdxs.map(async (i) => {
+      const result = await testGeminiKey(keys[i]);
+      s[i] = { status: result.ok ? 'ok' : 'error', result };
+    }));
+    setGeminiStatuses([...s]);
   };
 
   const updateField = (field: Partial<ApiConfig>) => {
@@ -65,8 +155,8 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const openAiValid = cfg.apiEnabled.openai && cfg.openAiKey.trim().startsWith('sk-');
   const canClose = geminiValid || openRouterValid || openAiValid;
 
-  const TABS: { id: TabId; icon: string; label: string; badge?: string; active: boolean }[] = [
-    { id: 'gemini', icon: 'fa-brands fa-google', label: 'Gemini', badge: keys.filter(k=>k.trim().startsWith('AIza')).length.toString(), active: cfg.apiEnabled.google },
+  const TABS: { id: TabId; icon: string; label: string; active: boolean }[] = [
+    { id: 'gemini', icon: 'fa-brands fa-google', label: 'Gemini', active: cfg.apiEnabled.google },
     { id: 'openrouter', icon: 'fa-solid fa-route', label: 'OpenRouter', active: cfg.apiEnabled.openrouter },
     { id: 'openai', icon: 'fa-solid fa-robot', label: 'OpenAI', active: cfg.apiEnabled.openai },
     { id: 'youtube', icon: 'fa-brands fa-youtube', label: 'YouTube', active: cfg.apiEnabled.youtube },
@@ -128,7 +218,7 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Tab Content */}
-        <div className="px-6 py-5 space-y-4 max-h-[380px] overflow-y-auto">
+        <div className="px-6 py-5 space-y-4 max-h-[420px] overflow-y-auto">
 
           {/* ── GEMINI TAB ── */}
           {activeTab === 'gemini' && (
@@ -147,26 +237,52 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 className="block text-center py-1.5 px-4 bg-teal-900/10 border border-teal-500/20 rounded-lg text-[11px] text-teal-400 font-bold hover:bg-teal-900/20 transition-all">
                 🔑 Lấy Gemini API Key miễn phí tại đây
               </a>
+
               <div className="space-y-2">
                 {keys.map((k, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input type="password" value={k} onChange={e => updateGeminiKey(i, e.target.value)}
-                      className={`flex-1 bg-[#060810] border rounded-lg p-2.5 text-sm font-mono placeholder-white/20 outline-none transition-colors ${
-                        k.trim().startsWith('AIza') ? 'border-teal-500/40 text-teal-200' : 'border-white/10 text-white focus:border-teal-500/40'
-                      }`}
-                      placeholder="AIzaSy..." />
-                    {k.trim().startsWith('AIza') && <i className="fa-solid fa-circle-check text-teal-400 self-center text-sm" />}
-                    {keys.length > 1 && (
-                      <button onClick={() => removeKey(i)} className="text-red-500/50 hover:text-red-300 p-2">
-                        <i className="fa-solid fa-trash text-sm" />
-                      </button>
+                  <div key={i} className="space-y-1">
+                    <div className="flex gap-2">
+                      <input type="password" value={k} onChange={e => updateGeminiKey(i, e.target.value)}
+                        className={`flex-1 bg-[#060810] border rounded-lg p-2.5 text-sm font-mono placeholder-white/20 outline-none transition-colors ${
+                          k.trim().startsWith('AIza') ? 'border-teal-500/40 text-teal-200' : 'border-white/10 text-white focus:border-teal-500/40'
+                        }`}
+                        placeholder="AIzaSy..." />
+                      {k.trim().startsWith('AIza') && (
+                        <TestButton
+                          onClick={() => handleTestGemini(i)}
+                          loading={geminiStatuses[i]?.status === 'loading'}
+                        />
+                      )}
+                      {keys.length > 1 && (
+                        <button onClick={() => removeKey(i)} className="text-red-500/50 hover:text-red-300 p-2">
+                          <i className="fa-solid fa-trash text-sm" />
+                        </button>
+                      )}
+                    </div>
+                    {geminiStatuses[i] && geminiStatuses[i].status !== 'idle' && (
+                      <div className="pl-1">
+                        <StatusBadge ks={geminiStatuses[i]} />
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
-              <button onClick={addKey} className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1.5 hover:underline">
-                <i className="fa-solid fa-plus" /> Thêm Key Gmail khác (để tăng hạn mức)
-              </button>
+
+              <div className="flex items-center justify-between">
+                <button onClick={addKey} className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1.5 hover:underline">
+                  <i className="fa-solid fa-plus" /> Thêm Key Gmail khác (tăng hạn mức)
+                </button>
+                {geminiValid && (
+                  <button
+                    onClick={handleTestAllGemini}
+                    disabled={geminiStatuses.some(s => s.status === 'loading')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-teal-900/20 border border-teal-500/30 text-teal-300 hover:bg-teal-900/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <i className="fa-solid fa-satellite-dish" /> Test Tất Cả
+                  </button>
+                )}
+              </div>
+
               {!geminiValid && (
                 <div className="text-[11px] text-amber-400 bg-amber-900/10 border border-amber-500/20 rounded-lg p-2 flex items-center gap-2">
                   <i className="fa-solid fa-triangle-exclamation" /> Key phải bắt đầu bằng "AIzaSy..."
@@ -194,10 +310,23 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </a>
               <div>
                 <label className="text-[10px] text-slate-400 font-bold uppercase mb-1.5 block">API Key</label>
-                <input type="password" value={cfg.openRouterKey}
-                  onChange={e => updateField({ openRouterKey: e.target.value })}
-                  className="w-full bg-[#060810] border border-white/10 rounded-lg p-2.5 text-sm font-mono text-white placeholder-white/20 outline-none focus:border-blue-500/40"
-                  placeholder="sk-or-..." />
+                <div className="flex gap-2">
+                  <input type="password" value={cfg.openRouterKey}
+                    onChange={e => { updateField({ openRouterKey: e.target.value }); setOrStatus({ status: 'idle' }); }}
+                    className="flex-1 bg-[#060810] border border-white/10 rounded-lg p-2.5 text-sm font-mono text-white placeholder-white/20 outline-none focus:border-blue-500/40"
+                    placeholder="sk-or-..." />
+                  {cfg.openRouterKey.trim().length > 10 && (
+                    <TestButton
+                      onClick={async () => {
+                        setOrStatus({ status: 'loading' });
+                        const r = await testOpenRouterKey(cfg.openRouterKey, cfg.openRouterModel);
+                        setOrStatus({ status: r.ok ? 'ok' : 'error', result: r });
+                      }}
+                      loading={orStatus.status === 'loading'}
+                    />
+                  )}
+                </div>
+                {orStatus.status !== 'idle' && <div className="mt-1 pl-1"><StatusBadge ks={orStatus} /></div>}
               </div>
               <div>
                 <label className="text-[10px] text-slate-400 font-bold uppercase mb-1.5 block">Model</label>
@@ -208,7 +337,7 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 </select>
               </div>
               <div className="text-[10px] text-slate-500 bg-white/5 rounded-lg p-2 border border-white/5">
-                💡 Gemini 2.0 Flash (Free) hoạt động rất tốt cho kịch bản Phật pháp và không tốn phí.
+                💡 Gemini 2.5 Flash Lite (Free) hoạt động rất tốt cho kịch bản Phật pháp, không tốn phí và hạn mức cao.
               </div>
             </div>
           )}
@@ -232,12 +361,25 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </a>
               <div>
                 <label className="text-[10px] text-slate-400 font-bold uppercase mb-1.5 block">API Key</label>
-                <input type="password" value={cfg.openAiKey}
-                  onChange={e => updateField({ openAiKey: e.target.value })}
-                  className={`w-full bg-[#060810] border rounded-lg p-2.5 text-sm font-mono placeholder-white/20 outline-none transition-colors ${
-                    cfg.openAiKey.startsWith('sk-') ? 'border-green-500/40 text-green-200' : 'border-white/10 text-white focus:border-green-500/40'
-                  }`}
-                  placeholder="sk-..." />
+                <div className="flex gap-2">
+                  <input type="password" value={cfg.openAiKey}
+                    onChange={e => { updateField({ openAiKey: e.target.value }); setOaiStatus({ status: 'idle' }); }}
+                    className={`flex-1 bg-[#060810] border rounded-lg p-2.5 text-sm font-mono placeholder-white/20 outline-none transition-colors ${
+                      cfg.openAiKey.startsWith('sk-') ? 'border-green-500/40 text-green-200' : 'border-white/10 text-white focus:border-green-500/40'
+                    }`}
+                    placeholder="sk-..." />
+                  {cfg.openAiKey.startsWith('sk-') && (
+                    <TestButton
+                      onClick={async () => {
+                        setOaiStatus({ status: 'loading' });
+                        const r = await testOpenAIKey(cfg.openAiKey, cfg.openAiModel);
+                        setOaiStatus({ status: r.ok ? 'ok' : 'error', result: r });
+                      }}
+                      loading={oaiStatus.status === 'loading'}
+                    />
+                  )}
+                </div>
+                {oaiStatus.status !== 'idle' && <div className="mt-1 pl-1"><StatusBadge ks={oaiStatus} /></div>}
               </div>
               <div>
                 <label className="text-[10px] text-slate-400 font-bold uppercase mb-1.5 block">Model</label>
@@ -269,10 +411,23 @@ const ApiKeyModal: React.FC<Props> = ({ isOpen, onClose }) => {
               </a>
               <div>
                 <label className="text-[10px] text-slate-400 font-bold uppercase mb-1.5 block">YouTube API Key</label>
-                <input type="password" value={cfg.youtubeApiKey}
-                  onChange={e => updateField({ youtubeApiKey: e.target.value })}
-                  className="w-full bg-[#060810] border border-white/10 rounded-lg p-2.5 text-sm font-mono text-white placeholder-white/20 outline-none focus:border-red-500/40"
-                  placeholder="AIzaSy... (Gemini key cũng hoạt động nếu đã bật YouTube API)" />
+                <div className="flex gap-2">
+                  <input type="password" value={cfg.youtubeApiKey}
+                    onChange={e => { updateField({ youtubeApiKey: e.target.value }); setYtStatus({ status: 'idle' }); }}
+                    className="flex-1 bg-[#060810] border border-white/10 rounded-lg p-2.5 text-sm font-mono text-white placeholder-white/20 outline-none focus:border-red-500/40"
+                    placeholder="AIzaSy... (Gemini key cũng hoạt động nếu đã bật YouTube API)" />
+                  {cfg.youtubeApiKey.trim().length > 5 && (
+                    <TestButton
+                      onClick={async () => {
+                        setYtStatus({ status: 'loading' });
+                        const r = await testYouTubeKey(cfg.youtubeApiKey);
+                        setYtStatus({ status: r.ok ? 'ok' : 'error', result: r });
+                      }}
+                      loading={ytStatus.status === 'loading'}
+                    />
+                  )}
+                </div>
+                {ytStatus.status !== 'idle' && <div className="mt-1 pl-1"><StatusBadge ks={ytStatus} /></div>}
               </div>
               <div className="text-[10px] text-slate-500 bg-white/5 rounded-lg p-2 border border-white/5">
                 💡 Nếu không có key này, Spy Module vẫn hoạt động nhưng chỉ lấy được tiêu đề và thumbnail (oEmbed fallback).

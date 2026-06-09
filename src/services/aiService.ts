@@ -83,8 +83,149 @@ export function getValidKeyCount(): number {
   return config.keyPool.filter(k => k && k.trim() !== '').length;
 }
 
+// ==================================================================================
+// API HEALTH CHECK — Kiểm tra liên tục từng key / provider
+// ==================================================================================
+export interface ApiTestResult {
+  ok: boolean;
+  latencyMs?: number;
+  error?: string;
+}
+
+/** Ping một Gemini key cụ thể bằng model text nhỏ nhất */
+export async function testGeminiKey(apiKey: string): Promise<ApiTestResult> {
+  const start = Date.now();
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
+      generationConfig: { maxOutputTokens: 1 },
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify(body),
+    });
+    const latencyMs = Date.now() - start;
+    if (res.status === 429) return { ok: false, latencyMs, error: '429 — Hết quota' };
+    if (res.status === 400) return { ok: false, latencyMs, error: '400 — Key không hợp lệ' };
+    if (res.status === 403) return { ok: false, latencyMs, error: '403 — Key bị từ chối' };
+    if (!res.ok) {
+      const t = await res.text();
+      return { ok: false, latencyMs, error: `HTTP ${res.status}` };
+    }
+    return { ok: true, latencyMs };
+  } catch (e: any) {
+    return { ok: false, latencyMs: Date.now() - start, error: e.message || 'Network error' };
+  }
+}
+
+/** Ping OpenRouter bằng prompt tối giản */
+export async function testOpenRouterKey(apiKey: string, model: string): Promise<ApiTestResult> {
+  const start = Date.now();
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'TUAI Dharma Master',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 1,
+      }),
+    });
+    const latencyMs = Date.now() - start;
+    if (!res.ok) {
+      const t = await res.text();
+      let msg = `HTTP ${res.status}`;
+      try { msg = JSON.parse(t)?.error?.message || msg; } catch {}
+      return { ok: false, latencyMs, error: msg };
+    }
+    return { ok: true, latencyMs };
+  } catch (e: any) {
+    return { ok: false, latencyMs: Date.now() - start, error: e.message || 'Network error' };
+  }
+}
+
+/** Ping OpenAI bằng prompt tối giản */
+export async function testOpenAIKey(apiKey: string, model: string): Promise<ApiTestResult> {
+  const start = Date.now();
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 1,
+      }),
+    });
+    const latencyMs = Date.now() - start;
+    if (!res.ok) {
+      const t = await res.text();
+      let msg = `HTTP ${res.status}`;
+      try { msg = JSON.parse(t)?.error?.message || msg; } catch {}
+      return { ok: false, latencyMs, error: msg };
+    }
+    return { ok: true, latencyMs };
+  } catch (e: any) {
+    return { ok: false, latencyMs: Date.now() - start, error: e.message || 'Network error' };
+  }
+}
+
+/** Ping YouTube Data API */
+export async function testYouTubeKey(apiKey: string): Promise<ApiTestResult> {
+  const start = Date.now();
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=${apiKey}`
+    );
+    const latencyMs = Date.now() - start;
+    if (res.status === 400) return { ok: false, latencyMs, error: '400 — Key không hợp lệ' };
+    if (res.status === 403) return { ok: false, latencyMs, error: '403 — API chưa được bật hoặc hết quota' };
+    if (!res.ok) return { ok: false, latencyMs, error: `HTTP ${res.status}` };
+    return { ok: true, latencyMs };
+  } catch (e: any) {
+    return { ok: false, latencyMs: Date.now() - start, error: e.message || 'Network error' };
+  }
+}
+
 export function hasAnyApiKey(): boolean {
   return getValidKeyCount() > 0 || !!config.openRouterKey || !!config.openAiKey;
+}
+
+// ==================================================================================
+// QUOTA COUNTDOWN — Event system để UI hiện countdown khi hết quota
+// ==================================================================================
+type QuotaListener = (secondsLeft: number) => void;
+const quotaListeners: QuotaListener[] = [];
+
+export function onQuotaCountdown(fn: QuotaListener) {
+  quotaListeners.push(fn);
+  return () => { const i = quotaListeners.indexOf(fn); if (i >= 0) quotaListeners.splice(i, 1); };
+}
+
+function emitQuota(s: number) { quotaListeners.forEach(fn => fn(s)); }
+
+/** Chờ N giây, emit countdown mỗi giây */
+async function waitWithCountdown(seconds: number) {
+  for (let s = seconds; s > 0; s--) {
+    emitQuota(s);
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  emitQuota(0);
+}
+
+// Lớp lỗi đặc biệt để phân biệt quota exhausted
+class QuotaExhaustedError extends Error {
+  constructor() { super('QUOTA_EXHAUSTED'); this.name = 'QuotaExhaustedError'; }
 }
 
 function getNextKey(): string {
@@ -141,14 +282,28 @@ function safeJSONParse(str: string): any {
   }
 }
 
-// === Google Gemini with Round-Robin ===
+// === Google Gemini with Round-Robin + Model Fallback ===
+// Thứ tự ưu tiên model: 2.5-flash → 2.5-flash-lite → 1.5-flash (fallback khi 503 overload)
+// NOTE: gemini-2.0-flash đã bị Google tắt từ 1/6/2026 — KHÔNG dùng model này!
+const GEMINI_MODEL_FALLBACKS = [
+  MODELS.text,                  // gemini-2.5-flash (primary)
+  'gemini-2.5-flash-lite',      // fallback khi 2.5 quá tải (15 RPM, 1000 req/ngày free)
+  'gemini-1.5-flash',           // fallback cuối
+];
+
 async function callGoogleWithRetry(prompt: string, systemPrompt: string, retries = 6): Promise<any> {
   let lastError: any;
+  let modelIndex = 0;
+  let quotaCount = 0; // đếm số lần bị 429
+
   for (let i = 0; i < retries; i++) {
     const apiKey = getNextKey();
     if (!apiKey) continue;
+
+    const currentModel = GEMINI_MODEL_FALLBACKS[modelIndex] || GEMINI_MODEL_FALLBACKS[GEMINI_MODEL_FALLBACKS.length - 1];
+
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.text}:generateContent`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent`;
       const body = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -162,25 +317,52 @@ async function callGoogleWithRetry(prompt: string, systemPrompt: string, retries
         },
         body: JSON.stringify(body)
       });
-      if (res.status === 429) throw new Error("429 Quota Exceeded");
+
+      if (res.status === 429) {
+        quotaCount++;
+        throw new Error("429 Quota Exceeded");
+      }
+
+      // 503 = server quá tải → thử model nhẹ hơn ngay
+      if (res.status === 503) {
+        await res.text(); // drain
+        console.warn(`[Gemini] ${currentModel} quá tải (503), đổi model...`);
+        if (modelIndex < GEMINI_MODEL_FALLBACKS.length - 1) modelIndex++;
+        throw new Error('503 Server Overloaded');
+      }
+
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`Google Error ${res.status}: ${errText}`);
+        // Lấy message sạch từ JSON nếu có
+        let cleanMsg = `Lỗi ${res.status}`;
+        try { cleanMsg = JSON.parse(errText)?.error?.message || cleanMsg; } catch {}
+        throw new Error(`Google Error ${res.status}: ${cleanMsg}`);
       }
+
       const data = await res.json();
-      if (!data.candidates?.[0]?.content) throw new Error("Invalid Gemini Response");
+      if (!data.candidates?.[0]?.content) throw new Error("Gemini không trả về nội dung hợp lệ");
+      if (currentModel !== MODELS.text) {
+        console.info(`[Gemini] Thành công với model dự phòng: ${currentModel}`);
+      }
       return safeJSONParse(data.candidates[0].content.parts[0].text);
+
     } catch (e: any) {
       lastError = e;
       const isQuota = e.message?.includes('429');
-      console.warn(`Attempt ${i + 1}/${retries} failed:`, e.message);
+      const isOverload = e.message?.includes('503');
+      console.warn(`Attempt ${i + 1}/${retries} [${currentModel}] failed:`, e.message);
       if (i < retries - 1) {
-        const waitTime = isQuota ? 2000 * (i + 1) : 1000;
+        const waitTime = isQuota ? 800 : isOverload ? 400 : 800;
         await new Promise(r => setTimeout(r, waitTime));
       }
     }
   }
-  throw lastError || new Error("All Google attempts failed.");
+
+  // Nếu phần lớn lỗi là quota → ném QuotaExhaustedError để tầng trên xử lý
+  if (quotaCount >= Math.ceil(retries / 2)) {
+    throw new QuotaExhaustedError();
+  }
+  throw lastError || new Error('Gemini thất bại sau tất cả các lần thử.');
 }
 
 // === OpenRouter API ===
@@ -246,50 +428,73 @@ async function callOpenAI(prompt: string, systemPrompt: string): Promise<any> {
   return safeJSONParse(data.choices?.[0]?.message?.content);
 }
 
-// === Main AI Caller with Fallbacks ===
-export async function callAI(prompt: string, systemPrompt: string): Promise<any> {
+// === Main AI Caller with Fallbacks + Quota Auto-Retry ===
+async function _callAIOnce(prompt: string, systemPrompt: string): Promise<any> {
   const { apiEnabled, keyPool } = config;
-  const anyEnabled = apiEnabled.google || apiEnabled.openrouter || apiEnabled.openai;
-  if (!anyEnabled) {
-    throw new Error("❌ Vui lòng bật ít nhất 1 API trong Config!");
-  }
-
   const hasGoogleKeys = keyPool.some(k => k && k.trim() !== '');
 
-  // Priority 1: Google Gemini (if enabled and keys are present)
+  // Priority 1: Google Gemini
   if (apiEnabled.google && hasGoogleKeys) {
     try {
       return await callGoogleWithRetry(prompt, systemPrompt);
     } catch (e: any) {
-      console.warn("Google Gemini Failed:", e);
+      if (e instanceof QuotaExhaustedError) throw e; // đẩy lên để xử lý countdown
+      console.warn('Google Gemini Failed:', e.message);
       if (!apiEnabled.openrouter && !apiEnabled.openai) throw e;
-      // Continue to fallback
     }
   } else if (apiEnabled.google && !hasGoogleKeys && !apiEnabled.openrouter && !apiEnabled.openai) {
-    throw new Error("❌ Vui lòng nhập ít nhất 1 Gemini API Key!");
+    throw new Error('❌ Vui lòng nhập ít nhất 1 Gemini API Key!');
   }
 
-  // Priority 2: OpenRouter (if enabled and key is present)
+  // Priority 2: OpenRouter
   if (apiEnabled.openrouter && config.openRouterKey) {
     try {
       return await callOpenRouter(prompt, systemPrompt);
     } catch (e: any) {
-      console.warn("OpenRouter Failed:", e);
+      console.warn('OpenRouter Failed:', e.message);
       if (!apiEnabled.openai) throw e;
-      // Continue to fallback
     }
   } else if (apiEnabled.openrouter && !config.openRouterKey && !apiEnabled.openai) {
-    throw new Error("❌ OpenRouter enabled but no API key provided!");
+    throw new Error('❌ OpenRouter đã bật nhưng chưa có API key!');
   }
 
-  // Priority 3: OpenAI (if enabled and key is present)
+  // Priority 3: OpenAI
   if (apiEnabled.openai && config.openAiKey) {
     return await callOpenAI(prompt, systemPrompt);
   } else if (apiEnabled.openai && !config.openAiKey) {
-    throw new Error("❌ OpenAI enabled but no API key provided!");
+    throw new Error('❌ OpenAI đã bật nhưng chưa có API key!');
   }
 
-  throw new Error("❌ Tất cả các API được bật đều thất bại hoặc thiếu API key hợp lệ!");
+  throw new Error('❌ Tất cả các API đều thất bại hoặc thiếu key hợp lệ!');
+}
+
+// === Exported callAI với auto-retry khi hết quota ===
+export async function callAI(prompt: string, systemPrompt: string): Promise<any> {
+  const { apiEnabled } = config;
+  const anyEnabled = apiEnabled.google || apiEnabled.openrouter || apiEnabled.openai;
+  if (!anyEnabled) {
+    throw new Error('❌ Vui lòng bật ít nhất 1 API trong Config!');
+  }
+
+  try {
+    return await _callAIOnce(prompt, systemPrompt);
+  } catch (e: any) {
+    // Nếu hết quota Google → tự chờ 60 giây rồi thử lại
+    if (e instanceof QuotaExhaustedError) {
+      console.warn('[Quota] Tất cả keys hết quota. Chờ 60 giây rồi thử lại...');
+      await waitWithCountdown(60);
+      // Retry lần 2 — nếu vẫn lỗi thì throw thật
+      try {
+        return await _callAIOnce(prompt, systemPrompt);
+      } catch (e2: any) {
+        if (e2 instanceof QuotaExhaustedError) {
+          throw new Error('⏱️ Vẫn hết quota sau khi đợi 60 giây. Vui lòng thêm API key hoặc thử lại sau.');
+        }
+        throw e2;
+      }
+    }
+    throw e;
+  }
 }
 
 function extractYoutubeId(url: string): string | null {
